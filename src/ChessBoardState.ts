@@ -416,6 +416,12 @@ export class ChessBoardState {
     }
 
 
+    public diff(otherBoard: ChessBoardState): string {
+
+        return '';
+    }
+
+
     // Generates a compressed base-64 of the board.
     
     public toBase64(): string {
