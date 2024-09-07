@@ -58,7 +58,7 @@ async function loadPosition(posId : string, baseDir : string) : Promise<{[key:st
         data = b ? b.toString() : "{}";
         return JSON.parse(data);
     } catch (err) {
-        console.log(err);
+        //console.log(err);
     }
     return {};
 }
@@ -80,10 +80,14 @@ async function importPositions(game : ChessGameState, gameId : string, baseDir :
 
             // 'nf3' : [<gameId>, <gameId> ...]
             const outData = await loadPosition(posId, baseDir);
-            // add this gameId to the position history
-            outData[moves[i]] = outData[moves[i]] ?? [];
-            outData[moves[i]].push(gameId);
-            await savePosition(outData, posId, baseDir);           
+
+            // check if we've already added this game to this position
+            if (!JSON.stringify(outData).includes(gameId)) {
+                // add this gameId to the position history
+                outData[moves[i]] = outData[moves[i]] ?? [];
+                outData[moves[i]].push(gameId);
+                await savePosition(outData, posId, baseDir);
+            }           
         }
     } catch (err) {
         console.log(err);
