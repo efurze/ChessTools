@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as readline from 'readline';
+import { ChessGameState } from './ChessGameState';
 
 class ScriptParams {
 
@@ -31,6 +32,16 @@ function readArgs(): ScriptParams {
     return params;
 }
 
+function saveGame(data : string[]) : void {
+    try {
+        const game = ChessGameState.fromPGN(data.join('\n'));
+        console.log(game.getMeta("White") + " vs " + game.getMeta("Black"));
+    } catch (err) {
+        console.log(err);
+        console.log(data);
+    }
+}
+
 async function doImport(): Promise<void> {
     const params = readArgs();
 
@@ -47,7 +58,7 @@ async function doImport(): Promise<void> {
     for await (const line of rl) {
         buffer.push(line);
         if (line.trim().startsWith("1.")) {
-            console.log(buffer);
+            saveGame(buffer);
             buffer = [];
         }
     }
