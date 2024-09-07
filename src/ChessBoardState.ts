@@ -3,18 +3,30 @@ export class ChessBoardState {
     static readonly VALID_PIECES = new Set('rnbkqpRNBKQP'.split(''));
     static readonly COLS_TO_LETTERS = 'abcdefgh'.split('');
     static readonly LETTERS_TO_COLS = ChessBoardState.COLS_TO_LETTERS.reduce<{[key: string]: number}>((acc, elem, idx) => { acc[elem] = idx; return acc; }, {});
-    static readonly PIECE_MOVES: {[key: string]: number[][]} = {
-        K: [[-1, 1], [0, 1], [1, 1], [-1, 0], [1, 0], [-1, -1], [0, -1], [1, -1]],
-        N: [[1, 2], [-1, 2], [2, 1], [-2, 1], [-1, -2], [1, -2], [-2, -1], [2, -1]],
-        B: [[-7, -7], [-6, -6], [-5, -5], [-4, -4], [-3, -3], [-2, -2], [-1, -1], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7],
-            [-7, 7], [-6, 6], [-5, 5], [-4, 4], [-3, 3], [-2, 2], [-1, 1], [1, -1], [2, -2], [3, -3], [4, -4], [5, -5], [6, -6], [7, -7]],
-        R: [[-7, 0], [-6, 0], [-5, 0], [-4, 0], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0],
-            [0, -7], [0, -6], [0, -5], [0, -4], [0, -3], [0, -2], [0, -1], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7]],
-        Q: [[-7, -7], [-6, -6], [-5, -5], [-4, -4], [-3, -3], [-2, -2], [-1, -1], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7],
-            [-7, 7], [-6, 6], [-5, 5], [-4, 4], [-3, 3], [-2, 2], [-1, 1], [1, -1], [2, -2], [3, -3], [4, -4], [5, -5], [6, -6], [7, -7],
-            [-7, 0], [-6, 0], [-5, 0], [-4, 0], [-3, 0], [-2, 0], [-1, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0],
-            [0, -7], [0, -6], [0, -5], [0, -4], [0, -3], [0, -2], [0, -1], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7]]
-    };
+    static readonly PIECE_MOVES = (() => { 
+        const ret: {[key: string]: number[][][]} = {
+            K: [[[-1, 1], [0, 1], [1, 1], [-1, 0], [1, 0], [-1, -1], [0, -1], [1, -1]]],
+            N: [[[1, 2], [-1, 2], [2, 1], [-2, 1], [-1, -2], [1, -2], [-2, -1], [2, -1]]],
+            B: [[[ -1, -1 ], [ -2, -2 ], [ -3, -3 ], [ -4, -4 ], [ -5, -5 ], [ -6, -6 ], [ -7, -7 ]],
+                [[ 1, -1 ], [ 2, -2 ], [ 3, -3 ], [ 4, -4 ], [ 5, -5 ], [ 6, -6 ], [ 7, -7 ]],
+                [[ -1, 1 ], [ -2, 2 ], [ -3, 3 ], [ -4, 4 ], [ -5, 5 ], [ -6, 6 ], [ -7, 7 ]],
+                [[ 1, 1 ], [ 2, 2 ], [ 3, 3 ], [ 4, 4 ], [ 5, 5 ], [ 6, 6 ], [ 7, 7 ]]],
+            R: [[[ -1, 0 ], [ -2, 0 ], [ -3, 0 ], [ -4, 0 ], [ -5, 0 ], [ -6, 0 ], [ -7, 0 ]],
+                [[ 1, 0 ], [ 2, 0 ], [ 3, 0 ], [ 4, 0 ], [ 5, 0 ], [ 6, 0 ], [ 7, 0 ]],
+                [[ 0, -1 ], [ 0, -2 ], [ 0, -3 ], [ 0, -4 ], [ 0, -5 ], [ 0, -6 ], [ 0, -7 ]],
+                [[ 0, 1 ], [ 0, 2 ], [ 0, 3 ], [ 0, 4 ], [ 0, 5 ], [ 0, 6 ], [ 0, 7 ]]]
+        };
+        ret.Q = [...ret.R, ...ret.B];
+        return ret;
+    })();
+    static readonly PIECE_MOVES_FLAT = (() => {
+        const ret: {[key: string]: number[][]} = {};
+        Object.keys(ChessBoardState.PIECE_MOVES).forEach((piece) => {
+            ret[piece] = ChessBoardState.PIECE_MOVES[piece].reduce((acc, elem) => [...acc, ...elem], []);
+        });
+        return ret;
+    })();
+
 
     private board: string[][];
     private activeColor: string;
@@ -47,8 +59,9 @@ export class ChessBoardState {
     public toPrintable(): string {
         let ret: string = `${this.fullMoveNumber} ${this.activeColor}\n`;
         for (let i = 0; i < 8; i++) {
-            ret += this.board[i].map((elem) => elem === '' ? '.' : elem).join(' ') + '\n';
+            ret += `${8 - i} ` + this.board[i].map((elem) => elem === '' ? '.' : elem).join(' ') + '\n';
         }
+        ret += '  a b c d e f g h';
         return ret;
     }
 
@@ -163,10 +176,6 @@ export class ChessBoardState {
         return `${fenBoard} ${this.activeColor} ${strCanCastle} ${this.enPassantTargetSquare === '' ? '-' : this.enPassantTargetSquare} ${this.halfMoveClock} ${this.fullMoveNumber}`;
     }
 
-
-    private pieceColor(piece: string): string {
-        return /^[RNBKQP]$/.test(piece) ? 'w' : 'b';
-    }
 
     public move(algMove: string): ChessBoardState {
         let shouldClearEnPassant = true;
@@ -416,9 +425,61 @@ export class ChessBoardState {
     }
 
 
-    public diff(otherBoard: ChessBoardState): string {
+    public diff(next: ChessBoardState): string {
+        // Look for castling
+        if (this.board[0][0] === 'r' && this.board[0][4] === 'k' && next.board[0][2] === 'k' && next.board[0][3] === 'r') {
+            return 'O-O-O';
+        } else if (this.board[0][7] === 'r' && this.board[0][4] === 'k' && next.board[0][6] === 'k' && next.board[0][5] === 'r') {
+            return 'O-O';
+        } else if (this.board[7][0] === 'R' && this.board[7][4] === 'K' && next.board[7][2] === 'K' && next.board[7][3] === 'R') {
+            return 'O-O-O';
+        } else if (this.board[7][7] === 'R' && this.board[7][4] === 'K' && next.board[7][6] === 'K' && next.board[7][5] === 'R') {
+            return 'O-O';
+        } 
 
-        return '';
+        // Find the piece that moved and where it moved.
+        let piece = null, capture = false, i = null, j = null, i2 = null, j2 = null;
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                if (this.board[row][col] !== '' && next.board[row][col] === '') {
+                    if (i !== null || j !== null) {
+                        if (piece === 'P') {
+                            // en passant
+                            if (next.activeColor === 'w') {
+                                [i, j] = [row, col];
+                            }
+                            capture = true;
+                        } else {
+                            throw 'More than one piece moved';
+                        }
+                    } else {
+                        piece = this.board[row][col].toUpperCase();
+                        [i, j] = [row, col];
+                    }
+                } else if (this.board[row][col] !== next.board[row][col]) {
+                    if (i2 !== null || j2 !== null) {
+                        throw 'More than one square moved to';
+                    }
+                    if (this.board[row][col] !== '') {
+                        capture = true;
+                    }
+
+                    [i2, j2] = [row, col];
+                }
+            }
+        }
+
+        if (i === null || j === null || i2 === null || j2 === null) {
+            throw 'Pieces not found';
+        }
+
+        let promotion = '';
+        if (piece === 'P' && (i2 === 0 || i2 === 7)) {
+            promotion = `=${next.board[i2][j2].toUpperCase()}`;
+        }
+
+        let check = next.isKingInCheck();
+        return `${(piece !== 'P') ? piece : (capture ? ChessBoardState.COLS_TO_LETTERS[j] : '')}${capture ? 'x' : ''}${ChessBoardState.COLS_TO_LETTERS[j2]}${8 - i2}${check}${promotion}`;
     }
 
 
@@ -559,7 +620,7 @@ export class ChessBoardState {
 
     private findPieceFromPos(piece: string, col: number, row: number, fromCol: number | null, fromRow: number | null): number[] {
         let ret: number[] | null = null;
-        for (const move of ChessBoardState.PIECE_MOVES[piece]) {
+        for (const move of ChessBoardState.PIECE_MOVES_FLAT[piece]) {
             const [i, j] = [row + move[0], col + move[1]];
             if (i < 0 || i > 7 || j < 0 || j > 7) {
                 continue;
@@ -570,6 +631,7 @@ export class ChessBoardState {
 
             if (this.board[i][j] === (this.activeColor === 'w' ? piece : piece.toLowerCase()) && this.moveIsPossible(piece, j, i, col, row)) {
                 if (ret) {
+                    console.log(this.toPrintable());
                     throw `Multiple ${piece} found that could make move`;
                 }
                 ret = [j, i];
@@ -579,6 +641,108 @@ export class ChessBoardState {
             throw `${piece} not found`;
         }
         return ret;
+    }
+
+    private findPieces(piece: string): number[][] {
+        const arr = [];
+        let i, j;
+        for (i = 0; i < 8; i++) {
+            for (j = 0; j < 8; j++) {
+                if (this.board[i][j] === piece) {
+                    arr.push([i, j]);
+                }
+            }
+        }
+        return arr;
+    }
+
+
+    private isCheckmate(col: number, row: number): string {
+        // Is it checkmate?
+        for (let move of ChessBoardState.PIECE_MOVES['K'][0]) {
+            const [i, j] = [row + move[0], col + move[1]];
+            if (i < 0 || j < 0 || i > 7 || j > 7) {
+                continue;
+            }
+            const regex = (this.activeColor === 'w') ? /^[PRNBQK]$/ : /^[prnbqk]$/;
+            if (!regex.test(this.board[i][j]) && this.isCheck(j, i) === '') {
+                return '+';
+            }
+        }
+        return '#';
+    }
+
+    private isCheck(col: number, row: number): string {
+        const [i, j] = [row, col];
+
+        // Pawn checks
+        if (this.activeColor === 'w' && (this.board[i - 1][j + 1] === 'p' || this.board[i - 1][j - 1] === 'p')) {
+            return '+';
+        } else if (this.activeColor === 'b' && (this.board[i + 1][j + 1] === 'P' || this.board[i + 1][j - 1] === 'P')) {
+            return '+';
+        }
+
+        // Knight checks
+        for (let move of ChessBoardState.PIECE_MOVES['N'][0]) {
+            let [i2, j2] = [i + move[0], j + move[1]];
+            if (i2 >= 0 && i2 <= 7 && j2 >= 0 && j2 <= 7) {
+                if (this.board[i2][j2] === (this.activeColor === 'w' ? 'n' : 'N')) {
+                    return '+';
+                }
+            }
+        }
+
+        // Rook checks
+        for (let moveGroup of ChessBoardState.PIECE_MOVES['R']) {
+            for (let move of moveGroup) {
+                let [i2, j2] = [i + move[0], j + move[1]];
+                if (i2 < 0 || i2 > 7 || j2 < 0 || j2 > 7) {
+                    break;
+                }
+                if ((this.board[i2][j2] === (this.activeColor === 'w' ? 'r' : 'R')) ||
+                    (this.board[i2][j2] === (this.activeColor === 'w' ? 'q' : 'Q'))) {
+                    return '+';
+                }
+                // Something in the way...
+                if (this.board[i2][j2] !== '') {
+                    break;
+                }
+            }
+        }
+
+        // Bishop checks
+        for (let moveGroup of ChessBoardState.PIECE_MOVES['B']) {
+            for (let move of moveGroup) {
+                let [i2, j2] = [i + move[0], j + move[1]];
+                if (i2 < 0 || i2 > 7 || j2 < 0 || j2 > 7) {
+                    break;
+                }
+                if (i2 >= 0 && i2 <= 7 && j2 >= 0 && j2 <= 7) {
+                    if ((this.board[i2][j2] === (this.activeColor === 'w' ? 'b' : 'B')) ||
+                        (this.board[i2][j2] === (this.activeColor === 'w' ? 'q' : 'Q'))) {
+                        return '+';
+                    }
+                }
+                // Something in the way...
+                if (this.board[i2][j2] !== '') {
+                    break;
+                }
+            }
+        }
+
+
+        return '';
+
+    }
+
+
+    public isKingInCheck(): string {
+        const [i, j] = this.findPieces((this.activeColor === 'w') ? 'K' : 'k')[0];
+        let check = this.isCheck(j, i);
+        if (check !== '') {
+            check = this.isCheckmate(j, i);
+        }
+        return check;
     }
 
 }
