@@ -1,6 +1,14 @@
 import { ChessGameState } from './ChessGameState';
 
 describe('PGN Import', () => {
+
+    it('should handle this pgn which once caused problems', () => {
+        const pgn = `1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 a6 5. Nc3 Qc7 6. Be2 Nc6 7. Be3 Nf6 8. O-O Be7 9. f4 d6 10. Qe1 O-O 11. Qg3 Nxd4 12. Bxd4 b5 13. e5 dxe5 14. Bxe5 Qc5+ 15. Kh1 Bb7 16. Bd3 g6 17. Rae1 b4 18. Nd1 Nh5 19. Qh3 f6 20. Qxe6+ Rf7 21. Bc4 Rf8 22. Bb8 Kh8 23. Nf2 Rg7 24. Nd3 Qc8 25. Bd6 Bxd6 26. Qxd6 Ng3+ 27. Kg1 Nxf1 28. Kxf1 a5 29. Nc5 Qb8 30. Qd4 Rd8 31. Qe3 Bd5 32. Bxd5 Rxd5 33. Nd3 Qc8 34. Re2 Rf7 35. b3 Kg7 36. Nb2 Qg4 37. h3 Qf5 38. Nd3 h5 39. Qf3 Qd7 40. g4 hxg4 41. hxg4 Rf8 42. Kg2 Rd4 43. Nf2 Rd2 44. Rxd2 Qxd2 45. Qb7+ Kh6 46. Kf3 Qc3+ 47. Kg2 Re8 48. g5+ fxg5 49. Qd7 Re3 50. Ng4+ Kh5 51. Nxe3 Qxe3 52. Qh7+ Kg4 53. Qd7+ Kxf4 54. Qf7+ Kg4 55. Qd7+ 1/2-1/2`;
+
+        // the test is that this doesn't throw
+        const game = ChessGameState.fromPGN(pgn);
+    });
+
     it('should handle a basic PGN import', () => {
         const pgn = `[Event "F/S Return Match"]
 [Site "Belgrade, Serbia JUG"]
@@ -98,12 +106,6 @@ describe('PGN Import', () => {
         expect(game.getMeta('Event')).toBe('URS Ch otbor56');
     });
 
-    it('should handle this pgn which once caused problems', () => {
-        const pgn = `1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 a6 5. Nc3 Qc7 6. Be2 Nc6 7. Be3 Nf6 8. O-O Be7 9. f4 d6 10. Qe1 O-O 11. Qg3 Nxd4 12. Bxd4 b5 13. e5 dxe5 14. Bxe5 Qc5+ 15. Kh1 Bb7 16. Bd3 g6 17. Rae1 b4 18. Nd1 Nh5 19. Qh3 f6 20. Qxe6+ Rf7 21. Bc4 Rf8 22. Bb8 Kh8 23. Nf2 Rg7 24. Nd3 Qc8 25. Bd6 Bxd6 26. Qxd6 Ng3+ 27. Kg1 Nxf1 28. Kxf1 a5 29. Nc5 Qb8 30. Qd4 Rd8 31. Qe3 Bd5 32. Bxd5 Rxd5 33. Nd3 Qc8 34. Re2 Rf7 35. b3 Kg7 36. Nb2 Qg4 37. h3 Qf5 38. Nd3 h5 39. Qf3 Qd7 40. g4 hxg4 41. hxg4 Rf8 42. Kg2 Rd4 43. Nf2 Rd2 44. Rxd2 Qxd2 45. Qb7+ Kh6 46. Kf3 Qc3+ 47. Kg2 Re8 48. g5+ fxg5 49. Qd7 Re3 50. Ng4+ Kh5 51. Nxe3 Qxe3 52. Qh7+ Kg4 53. Qd7+ Kxf4 54. Qf7+ Kg4 55. Qd7+ 1/2-1/2`;
-
-        // the test is that this doesn't throw
-        const game = ChessGameState.fromPGN(pgn);
-    });
 
     it('should handle a test game with promotions', () => {
         const pgn = `[Event "Test Game"]

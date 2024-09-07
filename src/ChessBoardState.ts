@@ -408,6 +408,7 @@ export class ChessBoardState {
             } else {
                 throw 'unknown move';
             }
+
         } catch(err) {
             throw `Illegal move ${algMove} - ${err}`;
         }
@@ -655,7 +656,7 @@ export class ChessBoardState {
 
     private moveCausesCheck(piece: string, sourceCol: number, sourceRow: number, destCol: number, destRow: number): boolean {
         const prevDest = this.board[destRow][destCol];
-        this.board[destRow][destCol] = piece;
+        this.board[destRow][destCol] = this.activeColor === 'w' ? piece : piece.toLowerCase();
         const prevSource = this.board[sourceRow][sourceCol];
         this.board[sourceRow][sourceCol] = '';
 

@@ -1,5 +1,4 @@
 import { ChessBoardState } from './ChessBoardState';
-
 describe('FEN Import / Export', () => {
     it('should handle the starting position', () => {
         const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
