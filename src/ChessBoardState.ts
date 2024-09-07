@@ -331,7 +331,6 @@ export class ChessBoardState {
                         this.board[i + 1][j2] = '';
                     } else {
                         if (this.board[i + 1][j1] !== 'P' || !/^[rnbqp]$/.test(this.board[i][j2])) {
-                            console.log(this.toPrintable());
                             throw 'pawn or piece to capture not there';
                         }
                         this.board[i + 1][j1] = '';    
