@@ -247,4 +247,94 @@ describe('Moves properly change the board', () => {
         expect(board.toFEN()).toBe(fen2);
     });
 
+
+});
+
+
+describe('isCheck works properly', () => {
+    
+    it('should handle a non-check position', () => {
+        const fen =  'k7/8/8/8/8/8/8/K7 w - - 0 1';
+        let board = ChessBoardState.fromFEN(fen);
+        expect(board.isKingInCheck()).toBe('');
+    });
+
+    it('should handle white pawn checks', () => {
+        const fen =  'k7/1P6/8/8/8/8/8/K7 b - - 0 1';
+        let board = ChessBoardState.fromFEN(fen);
+        expect(board.isKingInCheck()).toBe('+');
+    });
+
+    it('should handle black pawn checks', () => {
+        const fen =  'k7/8/8/8/8/8/1p6/K7 w - - 0 1';
+        let board = ChessBoardState.fromFEN(fen);
+        expect(board.isKingInCheck()).toBe('+');
+    });
+
+    it('should handle white queen checks', () => {
+        const fen =  'k7/8/8/8/8/8/Q7/K7 b - - 0 1';
+        let board = ChessBoardState.fromFEN(fen);
+        expect(board.isKingInCheck()).toBe('+');
+    });
+
+    it('should handle black queen checks', () => {
+        const fen =  'k7/q7/8/8/8/8/8/K7 w - - 0 1';
+        let board = ChessBoardState.fromFEN(fen);
+        expect(board.isKingInCheck()).toBe('+');
+    });    
+
+    it('should handle white rook checks', () => {
+        const fen =  'k7/8/8/8/8/8/R7/K7 b - - 0 1';
+        let board = ChessBoardState.fromFEN(fen);
+        expect(board.isKingInCheck()).toBe('+');
+    });
+
+    it('should handle black rook checks', () => {
+        const fen =  'k7/r7/8/8/8/8/8/K7 w - - 0 1';
+        let board = ChessBoardState.fromFEN(fen);
+        expect(board.isKingInCheck()).toBe('+');
+    });
+
+    it('should handle white bishop checks', () => {
+        const fen =  'k7/8/8/8/8/8/6B1/K7 b - - 0 1';
+        let board = ChessBoardState.fromFEN(fen);
+        expect(board.isKingInCheck()).toBe('+');
+    });
+
+    it('should handle black bishop checks', () => {
+        const fen =  'k7/6b1/8/8/8/8/8/K7 w - - 0 1';
+        let board = ChessBoardState.fromFEN(fen);
+        expect(board.isKingInCheck()).toBe('+');
+    });
+
+    it('should handle white knight checks', () => {
+        const fen =  'k7/2N5/8/8/8/8/8/K7 b - - 0 1';
+        let board = ChessBoardState.fromFEN(fen);
+        expect(board.isKingInCheck()).toBe('+');
+    });
+
+    it('should handle black knight checks', () => {
+        const fen =  'k7/8/8/8/8/8/2n5/K7 w - - 0 1';
+        let board = ChessBoardState.fromFEN(fen);
+        expect(board.isKingInCheck()).toBe('+');
+    });    
+
+});
+
+
+describe('Board diffs work properly', () => {
+
+    it('should handle a bunch of diffs', () => {
+        const pgn = '1. e4 Nc6 2. d4 Nb8 3. d5 Nc6 4. e5 Nb8 5. c4 Nc6 6. c5 Nb8 7. b4 f5 8. exf6 e5 9. dxe6 d5 10. cxd6 cxd6 11. Qxd6 Qxd6 12. Bb5+ Kd8 13. Bg5 a6 14. f7+ Qe7 15. Bxe7+ Kxe7 16. fxg8=Q Kd8 17. Qf7 g6 18. Qe8+ Kc7 19. Na3 Kb6 20. Rc1 Ka7 21. Qxc8 Nc6 22. Bxc6 bxc6 23. Qc7#';
+        const moves = pgn.replace(/\d+\.\s+/g, '').split(/\s+/);
+        const fen =  'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+        let board = ChessBoardState.fromFEN(fen);
+        for (const move of moves) {
+            const prev = board.copy();
+            board.move(move);
+            expect(prev.diff(board)).toBe(move);
+        }
+    });
+
 });
