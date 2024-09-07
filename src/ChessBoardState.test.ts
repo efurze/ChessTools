@@ -337,4 +337,17 @@ describe('Board diffs work properly', () => {
         }
     });
 
+    it('should handle diffs with disambiguation', () => {
+        const pgn = '1. e4 e5 2. Nf3 Nc6 3. d4 Nf6 4. dxe5 Be7 5. exf6 Nb4 6. fxe7 Nc6 7. exd8=B Nb4 8. Bxc7 Nd5 9. exd5 d6 10. Bxd6 b6 11. Bc7 a6 12. d6 Bb7 13. d7+ Kf8 14. d8=B Ke8 15. B1f4 f6 16. Bcd6 Bc8 17. Bb4 b5 18. Bdc7 a5 19. Bb8 a4 20. B8d6 a3 21. Bb8 h6 22. c4 Ra7 23. c5 Ra8 24. c6 Ra7 25. g4 Rd7 26. c7 Rd8 27. cxd8=B Ba6 28. Bde7 Bb7 29. Bf8 Ba6 30. Bf8d6 Kf7 31. Qe2 Kg8 32. Qe7 g5 33. Bde5 h5 34. Bxf6 h4 35. Qg7#';
+        const moves = pgn.replace(/\d+\.\s+/g, '').split(/\s+/);
+        const fen =  'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+        let board = ChessBoardState.fromFEN(fen);
+        for (const move of moves) {
+            const prev = board.copy();
+            board.move(move);
+            expect(prev.diff(board)).toBe(move);
+        }
+    });
+
 });
