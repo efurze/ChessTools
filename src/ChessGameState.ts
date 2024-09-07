@@ -18,6 +18,7 @@ export class ChessGameState {
             const match = line.match(/^\[([^\]]+)\s\"([^"]+)\"\]$/);
             if (!match) {
                 if (line.startsWith('1.')) {
+                    meta["SAN"] = line;
                     const moves = line.replace(/\d+\./g, '').split(/\s+/);
                     for (const move of moves) {
                         if (move !== '' && move !== '1-0' && move !== '0-1' && move !== '1/2-1/2') {
