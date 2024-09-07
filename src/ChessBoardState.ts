@@ -59,8 +59,9 @@ export class ChessBoardState {
     public toPrintable(): string {
         let ret: string = `${this.fullMoveNumber} ${this.activeColor}\n`;
         for (let i = 0; i < 8; i++) {
-            ret += this.board[i].map((elem) => elem === '' ? '.' : elem).join(' ') + '\n';
+            ret += `${8 - i} ` + this.board[i].map((elem) => elem === '' ? '.' : elem).join(' ') + '\n';
         }
+        ret += '  a b c d e f g h';
         return ret;
     }
 
