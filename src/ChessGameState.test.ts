@@ -99,7 +99,18 @@ describe('PGN Import', () => {
         expect(game.getMeta('SAN')).toBe(`1. e4 e5 2. Nf3 Nc6 3. d4 Nf6 4. dxe5 Be7 5. exf6 Nb4 6. fxe7 Nc6 7. exd8=B Nb4 8. Bxc7 Nd5 9. exd5 d6 10. Bxd6 b6 11. Bc7 a6 12. d6 Bb7 13. d7+ Kf8 14. d8=B Ke8 15. B1f4 f6 16. Bcd6 Bc8 17. Bb4 b5 18. Bdc7 a5 19. Bb8 a4 20. B8d6 a3 21. Bb8 h6 22. c4 Ra7 23. c5 Ra8 24. c6 Ra7 25. g4 Rd7 26. c7 Rd8 27. cxd8=B Ba6 28. Bde7 Bb7 29. Bf8 Ba6 30. Bf8d6 Kf7 31. Qe2 Kg8 32. Qe7 g5 33. Bde5 h5 34. Bxf6 h4 35. Qg7#`);
     });    
 
+    it('should parse moves into an array', () => {
+        const pgn = `[Event "Test Game"]
 
+1. e4 e5 2. Nf3 Nc6 3. d4 Nf6 4. dxe5 Be7 5. exf6 Nb4 6. fxe7 Nc6 7. exd8=B Nb4`
+        const game = ChessGameState.fromPGN(pgn);
+        const moves = game.getMeta('SAN');
+        expect(ChessGameState.parseMoves(moves)).toStrictEqual(['e4', 'e5', 'Nf3', 'Nc6', 'd4', 'Nf6', 'dxe5', 'Be7', 'exf6', 'Nb4', 'fxe7', 'Nc6', 'exd8=B', 'Nb4']);
+    
+        const pgn1 = "1. d4 c5 2. dxc5 Qa5+ 3. Nd2 Qxc5 4. Nb3 Qc7 5. Nf3 d6 6. e4 e5 7. Bd3 Bg4 8. h3 Bxf3 9. Qxf3 Nf6 10. Bg5 Be7 11. O-O a5 12. c3 a4 13. Nd2 h6 0-1";
+        expect(ChessGameState.parseMoves(pgn1)).toStrictEqual(['d4','c5','dxc5','Qa5+','Nd2','Qxc5','Nb3','Qc7','Nf3','d6','e4','e5','Bd3','Bg4','h3','Bxf3','Qxf3','Nf6','Bg5','Be7','O-O','a5','c3','a4','Nd2','h6', '0-1']);
+    });
+    
 });
 
 

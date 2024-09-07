@@ -9,6 +9,11 @@ export class ChessGameState {
         this.boardStates = boardStates;
     }
 
+    // turns "1. e4 e5 2. nf3 nc6" into [e4, e5, nf3, nc6]
+    public static parseMoves(pgn: string): string[] {
+        return pgn.replace(/\d+\./g, '').split(/\s+/).filter(Boolean);
+    }
+
     public static fromPGN(pgn: string): ChessGameState {
         const lines = pgn.split(/[\r\n]+/);
         const meta: {[key: string]: string} = {};
@@ -19,7 +24,7 @@ export class ChessGameState {
             if (!match) {
                 if (line.startsWith('1.')) {
                     meta["SAN"] = line;
-                    const moves = line.replace(/\d+\./g, '').split(/\s+/);
+                    const moves = ChessGameState.parseMoves(line);
                     for (const move of moves) {
                         if (move !== '' && move !== '1-0' && move !== '0-1' && move !== '1/2-1/2') {
                             boardStates.push(boardStates[boardStates.length - 1].copy().move(move));
