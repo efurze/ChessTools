@@ -88,9 +88,5 @@ describe('PGN Import', () => {
         expect(game.getMeta('Event')).toBe('Test Game');
         const boardStates = game.getBoardStates();
         expect(boardStates[boardStates.length - 1].toFEN()).toBe('1B4kr/6Q1/b4B2/1p4p1/1B3BPp/p4N2/PP3P1P/RN2KB1R b KQ - 1 35');
-    });    
-
-
+    });
 });
-
-
