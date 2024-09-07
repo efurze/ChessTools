@@ -79,6 +79,25 @@ describe('PGN Import', () => {
         expect(game.getMeta('Event')).toBe('Rated Bullet game');
     });
 
+        it('should handle a * game result', () => {
+        const pgn = `[Event "URS Ch otbor56"]
+[Site "Barnaul"]
+[Date "1988.??.??"]
+[Round "?"]
+[White "Moroz, Alexander"]
+[Black "Vyzmanavin, Alexey"]
+[Result "*"]
+[WhiteElo "2285"]
+[BlackElo "2565"]
+[ECO "B30j"]
+
+1. e4 c5 2. Nf3 Nc6 3. Nc3 e5 4. Bc4 Be7 5. d3 Nf6 6. O-O O-O 7. Nd5 d6 8. Nxe7+ Qxe7 9. Bg5 h6 10. Bh4 Be6 11. h3 Kh8 12. Qd2 Rg8 13. Bxf6 Qxf6 14. Nh2 g5 15. Ng4 Qg6 16. Ne3 f5 17. f3 Rad8 18. c3 a6 19. a4 Rd7 20. Rae1 Qf6 21. Qf2 Ne7 22. Rd1 Ng6 23. d4 cxd4 24. cxd4 exd4 25. Nd5 Bxd5 26. Bxd5 Nf4 27. Bc4 b5 28. axb5 axb5 29. Bxb5 Rb7 30. Ba6 Rb4 31. Rd2 Ra8 32. Bd3 Rab8 33. Rfd1 h5 34. Bf1 Qe5 35. b3 d3 36. Bxd3 Rxb3 37. Bf1 Rb2 38. Qd4 Rxd2 39. Qxe5+ dxe5 40. Rxd2 *`;
+
+        // the test is that this doesn't throw
+        const game = ChessGameState.fromPGN(pgn);
+        expect(game.getMeta('Event')).toBe('URS Ch otbor56');
+    });
+
     it('should handle a test game with promotions', () => {
         const pgn = `[Event "Test Game"]
 

@@ -26,7 +26,7 @@ export class ChessGameState {
                     meta["SAN"] = line;
                     const moves = ChessGameState.parseMoves(line);
                     for (const move of moves) {
-                        if (move !== '' && move !== '1-0' && move !== '0-1' && move !== '1/2-1/2') {
+                        if (move !== '' && move !== '1-0' && move !== '0-1' && move !== '1/2-1/2' && move !== '*') {
                             boardStates.push(boardStates[boardStates.length - 1].copy().move(move));
                         }
                     }
