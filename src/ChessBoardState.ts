@@ -630,6 +630,7 @@ export class ChessBoardState {
 
             if (this.board[i][j] === (this.activeColor === 'w' ? piece : piece.toLowerCase()) && this.moveIsPossible(piece, j, i, col, row)) {
                 if (ret) {
+                    console.log(this.toPrintable());
                     throw `Multiple ${piece} found that could make move`;
                 }
                 ret = [j, i];
