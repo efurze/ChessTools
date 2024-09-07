@@ -49,7 +49,17 @@ function readArgs(): ScriptParams {
     return params;
 }
 
-function loadPosition(id : string, baseDir : string) : {[key:string] : string[]}  {
+async function loadPosition(posId : string, baseDir : string) : Promise<{[key:string] : string[]}>  {
+    const filePath = path.join(baseDir, POSITION_DIR, posId.slice(0,2));
+    const fileName = posId.slice(2);
+    let data : string = "{}";
+    try {
+        const b : Buffer = await fsp.readFile(path.join(filePath, fileName));
+        data = b ? b.toString() : "{}";
+        return JSON.parse(data);
+    } catch (err) {
+        console.log(err);
+    }
     return {};
 }
 
@@ -69,7 +79,7 @@ async function importPositions(game : ChessGameState, gameId : string, baseDir :
             const posId = positions[i].toBase64();
 
             // 'nf3' : [<gameId>, <gameId> ...]
-            const outData = loadPosition(posId, baseDir);
+            const outData = await loadPosition(posId, baseDir);
             // add this gameId to the position history
             outData[moves[i]] = outData[moves[i]] ?? [];
             outData[moves[i]].push(gameId);
