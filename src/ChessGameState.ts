@@ -11,7 +11,7 @@ export class ChessGameState {
 
     // turns "1. e4 e5 2. nf3 nc6" into [e4, e5, nf3, nc6]
     public static parseMoves(pgn: string): string[] {
-        return pgn.replace(/\d+\./g, '').split(/\s+/).filter(Boolean);
+        return pgn.replace(/\d+\.\s*/g, '').split(/\s+/).filter(Boolean);
     }
 
     public static fromPGN(pgn: string): ChessGameState {
