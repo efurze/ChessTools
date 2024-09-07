@@ -331,7 +331,7 @@ export class ChessBoardState {
                         this.board[i + 1][j2] = '';
                     } else {
                         if (this.board[i + 1][j1] !== 'P' || !/^[rnbqp]$/.test(this.board[i][j2])) {
-                            console.log(this.toPrintable());
+                            //console.log(this.toPrintable());
                             throw 'pawn or piece to capture not there';
                         }
                         this.board[i + 1][j1] = '';    
@@ -631,7 +631,7 @@ export class ChessBoardState {
 
             if (this.board[i][j] === (this.activeColor === 'w' ? piece : piece.toLowerCase()) && this.moveIsPossible(piece, j, i, col, row)) {
                 if (ret) {
-                    console.log(this.toPrintable());
+                    //console.log(this.toPrintable());
                     throw `Multiple ${piece} found that could make move`;
                 }
                 ret = [j, i];
