@@ -331,7 +331,6 @@ export class ChessBoardState {
                         this.board[i + 1][j2] = '';
                     } else {
                         if (this.board[i + 1][j1] !== 'P' || !/^[rnbqp]$/.test(this.board[i][j2])) {
-                            //console.log(this.toPrintable());
                             throw 'pawn or piece to capture not there';
                         }
                         this.board[i + 1][j1] = '';    
@@ -603,20 +602,38 @@ export class ChessBoardState {
         return new ChessBoardState(board, activeColor, canCastle, enPassantTargetSquare, 0, 1);
     }
 
-    private moveIsPossible(piece: string, sourceCol: number, sourceRow: number, destCol: number, destRow: number): boolean {
+    private moveIsBlocked(piece: string, sourceCol: number, sourceRow: number, destCol: number, destRow: number): boolean {
         if (piece === 'N' || piece === 'K') {
-            return true;
+            return false;
         }
+
+        // Check if there's stuff in the way
         const colStep = (destCol === sourceCol ? 0 : (destCol > sourceCol ? 1 : -1));    
         const rowStep = (destRow === sourceRow ? 0 : (destRow > sourceRow ? 1 : -1));
 
         for (let i = sourceRow + rowStep, j = sourceCol + colStep; !(i === destRow && j === destCol); i += rowStep, j += colStep) {
             if (this.board[i][j] !== '') {
-                return false;
+                return true;
             }
         }
-        return true;
+        return false;
     }
+
+
+    private moveCausesCheck(piece: string, sourceCol: number, sourceRow: number, destCol: number, destRow: number): boolean {
+        const prevDest = this.board[destRow][destCol];
+        this.board[destRow][destCol] = piece;
+        const prevSource = this.board[sourceRow][sourceCol];
+        this.board[sourceRow][sourceCol] = '';
+
+        const check = this.isKingInCheck();
+
+        this.board[destRow][destCol] = prevDest;
+        this.board[sourceRow][sourceCol] = prevSource;
+
+        return check !== '';
+    }
+
 
     private findPieceFromPos(piece: string, col: number, row: number, fromCol: number | null, fromRow: number | null): number[] {
         let ret: number[] | null = null;
@@ -629,12 +646,15 @@ export class ChessBoardState {
                 continue;
             }
 
-            if (this.board[i][j] === (this.activeColor === 'w' ? piece : piece.toLowerCase()) && this.moveIsPossible(piece, j, i, col, row)) {
+            if (this.board[i][j] === (this.activeColor === 'w' ? piece : piece.toLowerCase()) && !this.moveIsBlocked(piece, j, i, col, row)) {
                 if (ret) {
-                    //console.log(this.toPrintable());
-                    throw `Multiple ${piece} found that could make move`;
+                    // Duplication. So, select the one that doesn't cause check.
+                    if (!this.moveCausesCheck(piece, j, i, col, row)) {
+                        ret = [j, i];
+                    }
+                } else {
+                    ret = [j, i];
                 }
-                ret = [j, i];
             }
         }
         if (!ret) {
