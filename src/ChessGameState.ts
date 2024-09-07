@@ -15,7 +15,7 @@ export class ChessGameState {
     }
 
     public static fromPGN(pgn: string): ChessGameState {
-        const lines = pgn.split(/[\r\n]+/);
+        const lines = pgn.split(/[\r\n]+/).filter(Boolean);
         const meta: {[key: string]: string} = {};
         const boardStates: ChessBoardState[] = [ChessBoardState.fromFEN('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')];
 
@@ -31,7 +31,6 @@ export class ChessGameState {
                         }
                     }
                 }
-                break;
             } else {
                 meta[match[1]] = match[2];
             }
