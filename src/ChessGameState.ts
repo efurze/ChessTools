@@ -32,7 +32,7 @@ export class ChessGameState {
                     }
                 }
             } else {
-                meta[match[1]] = match[2];
+                meta[match[1]] = match[2].replace(/\"/g, ""); // strip off the quotes
             }
         }
 
@@ -42,6 +42,10 @@ export class ChessGameState {
     public getMeta(key: string): string {
         return this.meta[key];
     } 
+
+    public getMetaKeys(): string[] {
+        return Object.keys(this.meta);
+    }
 
     public getBoardStates(): ChessBoardState[] {
         return this.boardStates;
