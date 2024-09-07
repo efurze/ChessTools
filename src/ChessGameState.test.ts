@@ -57,6 +57,28 @@ describe('PGN Import', () => {
         expect(boardStates[boardStates.length - 1].toFEN()).toBe('3k4/5RN1/4P3/5P2/7K/8/8/6q1 b - - 2 136');
     });
 
+    it('should handle random lichess bullet game', () => {
+        const pgn = `[Event "Rated Bullet game"]
+[Site "https://lichess.org/yhlhoekd"]
+[White "marferrom"]
+[Black "el_panuelo"]
+[Result "1-0"]
+[UTCDate "2013.06.30"]
+[UTCTime "22:15:20"]
+[WhiteElo "1524"]
+[BlackElo "1652"]
+[WhiteRatingDiff "+124"]
+[BlackRatingDiff "-15"]
+[ECO "A40"]
+[Opening "Horwitz Defense"]
+[TimeControl "60+0"]
+[Termination "Time forfeit"]
+
+1. d4 e6 2. c4 h6 3. Nc3 Ne7 4. e4 d6 5. f4 c6 6. Nf3 Na6 7. Bd3 Nc7 8. O-O b6 9. f5 Bb7 10. Re1 g6 11. fxe6 fxe6 12. e5 d5 13. cxd5 Nexd5 14. Bxg6+ Kd7 15. Qb3 Be7 16. Ne4 b5 17. Nc5+ Bxc5 18. dxc5 a5 19. a4 Ba6 20. axb5 Nxb5 21. Be3 Rb8 22. Qc2 Rg8 23. Be4 Qf8 24. Qd2 Qg7 25. Rxa5 Ra8 26. b4 Nc7 27. Bxd5 Nxd5 28. Bd4 Rgf8 29. Nh4 Nf4 30. g3 Nh3+ 31. Kg2 Rf2+ 32. Bxf2+ Ke7 33. Be3 Rd8 34. Qe2 Ng5 35. Qxa6 Rd2+ 36. Kh1 Qxe5 37. Qb7+ Kf6 38. Bxg5+ 1-0`;
+        const game = ChessGameState.fromPGN(pgn);
+        expect(game.getMeta('Event')).toBe('Rated Bullet game');
+    });
+
     it('should handle a test game with promotions', () => {
         const pgn = `[Event "Test Game"]
 
