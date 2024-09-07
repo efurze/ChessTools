@@ -472,13 +472,46 @@ export class ChessBoardState {
             throw 'Pieces not found';
         }
 
+        // Look for any disambiguations
+        let colNeedsDisambiguation = false, rowNeedsDisambiguation = false;
+        if (piece && piece !== 'P' && piece !== 'K') {
+            const movesToSquare = this.findMovesToSquare(piece, j2, i2);
+            if (movesToSquare.length > 1) {
+                const filteredMovesToSquare = movesToSquare.filter((move) => {
+                    const [i3, j3] = move;
+                    return !this.moveCausesCheck(piece, j2, i2, j3, i3);
+                });
+                if (filteredMovesToSquare.length > 1) {
+                    
+                    for (const move of filteredMovesToSquare) {
+                        const [i3, j3] = move;
+
+                        if (i3 === i && j3 === j) {
+                            continue;
+                        } else if (i3 === i) {
+                            colNeedsDisambiguation = true;
+                        } else if (j3 === j) {
+                            rowNeedsDisambiguation = true;
+                        } 
+                    }
+                    if (!colNeedsDisambiguation && !rowNeedsDisambiguation) {
+                        colNeedsDisambiguation = true;  // Disambiguate with column if either is possible.
+                    }
+                }
+
+            }
+        }
+
         let promotion = '';
         if (piece === 'P' && (i2 === 0 || i2 === 7)) {
             promotion = `=${next.board[i2][j2].toUpperCase()}`;
         }
 
         let check = next.isKingInCheck();
-        return `${(piece !== 'P') ? piece : (capture ? ChessBoardState.COLS_TO_LETTERS[j] : '')}${capture ? 'x' : ''}${ChessBoardState.COLS_TO_LETTERS[j2]}${8 - i2}${check}${promotion}`;
+        return `${(piece !== 'P') ? piece : (capture ? ChessBoardState.COLS_TO_LETTERS[j] : '')}` + 
+               `${colNeedsDisambiguation ? ChessBoardState.COLS_TO_LETTERS[j] : ''}` +
+               `${rowNeedsDisambiguation ? (8 - i) : ''}` +
+               `${capture ? 'x' : ''}${ChessBoardState.COLS_TO_LETTERS[j2]}${8 - i2}${check}${promotion}`;
     }
 
 
@@ -765,4 +798,29 @@ export class ChessBoardState {
         return check;
     }
 
+
+    private findMovesToSquare(piece: string, col: number, row: number): number[][] {
+        const ret: number[][] = [];
+        const [i, j] = [row, col];
+
+        for (let moveGroup of ChessBoardState.PIECE_MOVES[piece]) {
+            for (let move of moveGroup) {
+                let [i2, j2] = [i + move[0], j + move[1]];
+                if (i2 < 0 || i2 > 7 || j2 < 0 || j2 > 7) {
+                    break;
+                }
+                
+                if (this.board[i2][j2] === piece) {
+                    ret.push([i2, j2]);
+                    break;
+                } else if (this.board[i2][j2] !== '' && piece !== 'N') {
+                    break;
+                }
+            }
+        }
+
+        return ret;
+    }
+
 }
+
