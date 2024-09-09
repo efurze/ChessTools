@@ -147,7 +147,7 @@ class PositionGenerator {
         }
     }
 
-    * enumerateFiles(dir : string) : Generator<string> {
+    private * enumerateFiles(dir : string) : Generator<string> {
       for (const entry of fs.readdirSync(dir)) {
         const fullPath : string = path.join(dir, entry);
         if (fs.statSync(fullPath).isDirectory()) {
@@ -182,6 +182,7 @@ class PositionGenerator {
 
         } else {
             self.readAllGames = true;
+            console.log("end of input");
             self.writer.dataDone();
         }
     }
@@ -246,6 +247,9 @@ class BufferedWriter {
                 fsp.writeFile(toWrite.filepath, toWrite.data)
                     .finally(function() {
                         self.pendingWrites--;
+                        if (self.done && self.pendingWrites % 100 == 0) {
+                            console.log(self.pendingWrites + " files left to write.");
+                        }
                         self.pump();
                     });
             }
