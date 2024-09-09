@@ -101,7 +101,7 @@ function readArgs(): ScriptParams {
  function savePosition(history : {[key:string] : string[]}, posId : string, baseDir : string) : void {
     const filePath = path.join(baseDir, POSITION_DIR, posId.slice(0,2));
     //console.log(filePath);
-    QueueManager.writeFile(filePath, posId.slice(2), JSON.stringify(history, null, " "));
+    BufferedWriter.writeFile(filePath, posId.slice(2), JSON.stringify(history, null, " "));
 }
 
 
@@ -144,20 +144,52 @@ function* enumerateFiles(dir : string) : Generator<string> {
   }
 }
 
- function run(): void {
-    const params = readArgs();
+let _params : ScriptParams;
+let fileGenerator : Generator<string>;
+let gameCount : number = 0;
+let readAllGames : boolean = false;
 
-    console.log("Initializing destination directory");
-    initializeOutputDirectory(params.outputDir());
+function readAnotherGame() : void {
+    const file : string | undefined = fileGenerator.next().value;
+    if (file) {
+        try {
+            const data : Buffer = fs.readFileSync(file);
+            const game = ChessGameState.fromJSON(JSON.parse(data.toString()));
 
-    console.log("Reading game directory");
-    const filegenerator : Generator<string> = enumerateFiles(path.join(params.outputDir(), GAME_DIR));
+            const enclosingDir : string = path.basename(path.dirname(file));
+            const fileName : string = path.basename(file);
+            
+            updatePositionsForGame(game, enclosingDir + fileName, _params.outputDir());
+            if (++gameCount % 10 == 0) {
+                console.error("game " + gameCount);
+            }
+        } catch (err) {
+            console.log(err);
+            console.log(file);
+        }
 
-    QueueManager.init(params, filegenerator);
-    QueueManager.start();
+    } else {
+        readAllGames = true;
+        BufferedWriter.dataDone();
+    }
 }
 
-class QueueManager {
+
+
+function run(): void {
+    _params = readArgs();
+
+    console.log("Initializing destination directory");
+    initializeOutputDirectory(_params.outputDir());
+
+    console.log("Reading game directory");
+    fileGenerator  = enumerateFiles(path.join(_params.outputDir(), GAME_DIR));
+
+    BufferedWriter.init(readAnotherGame);
+    BufferedWriter.start();
+}
+
+class BufferedWriter {
 
     
     // This limits the number of open file descriptors
@@ -165,75 +197,50 @@ class QueueManager {
     private static MAX_BUFFER : number = 5000;
     private static pendingWrites : number = 0;
     private static buffer : {filepath:string, data:string}[] = [];
-    private static fileGenerator: Generator<string>;
-    private static params: ScriptParams;
+    private static requestMoreDataCB : ()=>void;
     private static gameCount: number = 0;
     private static done: boolean = false;
 
     private constructor() {}
 
-    public static init(params:ScriptParams, fg:Generator<string>) : void {
-        QueueManager.fileGenerator = fg;
-        QueueManager.params = params;
+    public static init(requestDataCB : ()=>void) : void {
+        BufferedWriter.requestMoreDataCB = requestDataCB;
+    }
+
+    public static dataDone() : void {
+        BufferedWriter.done = true;
     }
 
     public static start() : void {
-        QueueManager.pump();
+        BufferedWriter.pump();
     }
 
     public static writeFile(dir:string, file:string, data:string) : void {
-        QueueManager.buffer.push({
+        BufferedWriter.buffer.push({
             filepath: path.join(dir, file),
             data: data
         });
 
-        QueueManager.pump();
-    }
-
-    private static readMore() : void {
-        const file : string | undefined = QueueManager.fileGenerator.next().value;
-        if (file) {
-            try {
-                const data : Buffer = fs.readFileSync(file);
-                const game = ChessGameState.fromJSON(JSON.parse(data.toString()));
-
-                const enclosingDir : string = path.basename(path.dirname(file));
-                const fileName : string = path.basename(file);
-                
-                updatePositionsForGame(game, enclosingDir + fileName, QueueManager.params.outputDir());
-                if (++QueueManager.gameCount % 10 == 0) {
-                    console.error("game " + QueueManager.gameCount);
-                }
-            } catch (err) {
-                console.log(err);
-                console.log(file);
-            }
-
-            QueueManager.pump();
-
-        } else {
-            QueueManager.done = true;
-            console.log("End of input. " + QueueManager.buffer.length + " writes remaining");
-        }
+        BufferedWriter.pump();
     }
 
     private static pump() : void {
-        setTimeout(function(){QueueManager.doPump();}, 0);
+        setTimeout(function(){BufferedWriter.doPump();}, 0);
     }
 
     private static doPump() : void {
-        //console.log("doPump", "buffer:", QueueManager.buffer.length, "pending:", QueueManager.pendingWrites);
-        if (QueueManager.buffer.length < QueueManager.MAX_BUFFER) {
-            QueueManager.readMore();
+        //console.log("doPump", "buffer:", BufferedWriter.buffer.length, "pending:", BufferedWriter.pendingWrites);
+        if (BufferedWriter.buffer.length < BufferedWriter.MAX_BUFFER && !BufferedWriter.done) {
+            BufferedWriter.requestMoreDataCB();
         }
-        if (QueueManager.buffer.length && QueueManager.pendingWrites < QueueManager.MAX_PENDING) {
-            QueueManager.pendingWrites++;
-            const toWrite : {filepath:string, data:string} | undefined = QueueManager.buffer.shift();
+        if (BufferedWriter.buffer.length && BufferedWriter.pendingWrites < BufferedWriter.MAX_PENDING) {
+            BufferedWriter.pendingWrites++;
+            const toWrite : {filepath:string, data:string} | undefined = BufferedWriter.buffer.shift();
             if (toWrite) {
                 fsp.writeFile(toWrite.filepath, toWrite.data)
                     .finally(function() {
-                        QueueManager.pendingWrites--;
-                        QueueManager.pump();
+                        BufferedWriter.pendingWrites--;
+                        BufferedWriter.pump();
                     });
             }
         }
