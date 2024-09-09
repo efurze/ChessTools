@@ -101,7 +101,7 @@ function readArgs(): ScriptParams {
  function savePosition(history : {[key:string] : string[]}, posId : string, baseDir : string) : void {
     const filePath = path.join(baseDir, POSITION_DIR, posId.slice(0,2));
     //console.log(filePath);
-    BufferedWriter.writeFile(filePath, posId.slice(2), JSON.stringify(history, null, " "));
+    writer.writeFile(filePath, posId.slice(2), JSON.stringify(history, null, " "));
 }
 
 
@@ -144,8 +144,9 @@ function* enumerateFiles(dir : string) : Generator<string> {
   }
 }
 
-let _params : ScriptParams;
+let params : ScriptParams;
 let fileGenerator : Generator<string>;
+let writer : BufferedWriter;
 let gameCount : number = 0;
 let readAllGames : boolean = false;
 
@@ -159,7 +160,7 @@ function readAnotherGame() : void {
             const enclosingDir : string = path.basename(path.dirname(file));
             const fileName : string = path.basename(file);
             
-            updatePositionsForGame(game, enclosingDir + fileName, _params.outputDir());
+            updatePositionsForGame(game, enclosingDir + fileName, params.outputDir());
             if (++gameCount % 10 == 0) {
                 console.error("game " + gameCount);
             }
@@ -170,23 +171,23 @@ function readAnotherGame() : void {
 
     } else {
         readAllGames = true;
-        BufferedWriter.dataDone();
+        writer.dataDone();
     }
 }
 
 
 
 function run(): void {
-    _params = readArgs();
+    params = readArgs();
 
     console.log("Initializing destination directory");
-    initializeOutputDirectory(_params.outputDir());
+    initializeOutputDirectory(params.outputDir());
 
     console.log("Reading game directory");
-    fileGenerator  = enumerateFiles(path.join(_params.outputDir(), GAME_DIR));
+    fileGenerator  = enumerateFiles(path.join(params.outputDir(), GAME_DIR));
 
-    BufferedWriter.init(readAnotherGame);
-    BufferedWriter.start();
+    writer = new BufferedWriter(readAnotherGame);
+    writer.start();
 }
 
 class BufferedWriter {
@@ -195,52 +196,52 @@ class BufferedWriter {
     // This limits the number of open file descriptors
     private static MAX_PENDING : number = 500;
     private static MAX_BUFFER : number = 5000;
-    private static pendingWrites : number = 0;
-    private static buffer : {filepath:string, data:string}[] = [];
-    private static requestMoreDataCB : ()=>void;
-    private static gameCount: number = 0;
-    private static done: boolean = false;
+    private pendingWrites : number = 0;
+    private buffer : {filepath:string, data:string}[] = [];
+    private requestMoreDataCB : ()=>void;
+    private gameCount: number = 0;
+    private done: boolean = false;
 
-    private constructor() {}
-
-    public static init(requestDataCB : ()=>void) : void {
-        BufferedWriter.requestMoreDataCB = requestDataCB;
+    public constructor(requestDataCB : ()=>void) {
+        this.requestMoreDataCB = requestDataCB;
     }
 
-    public static dataDone() : void {
-        BufferedWriter.done = true;
+    public dataDone() : void {
+        this.done = true;
     }
 
-    public static start() : void {
-        BufferedWriter.pump();
+    public start() : void {
+        this.pump();
     }
 
-    public static writeFile(dir:string, file:string, data:string) : void {
-        BufferedWriter.buffer.push({
+    public writeFile(dir:string, file:string, data:string) : void {
+        this.buffer.push({
             filepath: path.join(dir, file),
             data: data
         });
 
-        BufferedWriter.pump();
+        this.pump();
     }
 
-    private static pump() : void {
-        setTimeout(function(){BufferedWriter.doPump();}, 0);
+    private pump() : void {
+        const self = this;
+        setTimeout(function(){self.doPump();}, 0);
     }
 
-    private static doPump() : void {
-        //console.log("doPump", "buffer:", BufferedWriter.buffer.length, "pending:", BufferedWriter.pendingWrites);
-        if (BufferedWriter.buffer.length < BufferedWriter.MAX_BUFFER && !BufferedWriter.done) {
-            BufferedWriter.requestMoreDataCB();
+    private doPump() : void {
+        const self = this;
+        //console.log("doPump", "buffer:", this.buffer.length, "pending:", this.pendingWrites);
+        if (self.buffer.length < BufferedWriter.MAX_BUFFER && !self.done) {
+            self.requestMoreDataCB();
         }
-        if (BufferedWriter.buffer.length && BufferedWriter.pendingWrites < BufferedWriter.MAX_PENDING) {
-            BufferedWriter.pendingWrites++;
-            const toWrite : {filepath:string, data:string} | undefined = BufferedWriter.buffer.shift();
+        if (self.buffer.length && self.pendingWrites < BufferedWriter.MAX_PENDING) {
+            self.pendingWrites++;
+            const toWrite : {filepath:string, data:string} | undefined = self.buffer.shift();
             if (toWrite) {
                 fsp.writeFile(toWrite.filepath, toWrite.data)
                     .finally(function() {
-                        BufferedWriter.pendingWrites--;
-                        BufferedWriter.pump();
+                        self.pendingWrites--;
+                        self.pump();
                     });
             }
         }
