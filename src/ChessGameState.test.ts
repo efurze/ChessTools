@@ -160,6 +160,28 @@ describe('PGN Import', () => {
         const pgn1 = "1. d4 c5 2. dxc5 Qa5+ 3. Nd2 Qxc5 4. Nb3 Qc7 5. Nf3 d6 6. e4 e5 7. Bd3 Bg4 8. h3 Bxf3 9. Qxf3 Nf6 10. Bg5 Be7 11. O-O a5 12. c3 a4 13. Nd2 h6 0-1";
         expect(ChessGameState.parseMoves(pgn1)).toStrictEqual(['d4','c5','dxc5','Qa5+','Nd2','Qxc5','Nb3','Qc7','Nf3','d6','e4','e5','Bd3','Bg4','h3','Bxf3','Qxf3','Nf6','Bg5','Be7','O-O','a5','c3','a4','Nd2','h6', '0-1']);
     });
+
+    it('should handle JSON', () => {
+        const str = `{
+ "Event": "Paris",
+ "Site": "Paris FRA",
+ "Date": "1900.??.??",
+ "Round": "1",
+ "White": "Maroczy, Geza",
+ "Black": "Mieses, Jacques",
+ "Result": "1-0",
+ "ECO": "B01g",
+ "SAN": "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 g6 5. Bf4 Bg7 6. Qd2 c6 7. Nf3 Bf5 8. Ne5 Nf6 9. Bc4 e6 10. Be2 Qd8 11. O-O-O Nd5 12. Nc4 Nxf4 13. Qxf4 O-O 14. g4 g5 15. Qe3 Bg6 16. Ne5 Bxe5 17. dxe5 Qe7 18. f4 gxf4 19. Qxf4 f6 20. Rhf1 Nd7 21. exf6 Nxf6 22. Qe5 Rae8 23. h4 Nd5 24. h5 Nxc3 25. bxc3 Rxf1 26. Rxf1 Bf7 27. Bd3 h6 28. Rf6 Qf8 29. g5 hxg5 30. h6 Qa3+ 31. Kb1 Kf8 32. Rxf7+ Kxf7 33. Qg7# 1-0"
+}`
+        const pgnObj = JSON.parse(str);
+
+        const game = ChessGameState.fromJSON(pgnObj);
+        expect(game.getMeta('Event')).toBe('Paris');
+        expect(game.getMeta('Site')).toBe('Paris FRA');
+        expect(game.getMeta('White')).toBe('Maroczy, Geza');
+        expect(game.getMeta('Black')).toBe('Mieses, Jacques');
+        expect(game.getMeta('SAN')).toBe("1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 g6 5. Bf4 Bg7 6. Qd2 c6 7. Nf3 Bf5 8. Ne5 Nf6 9. Bc4 e6 10. Be2 Qd8 11. O-O-O Nd5 12. Nc4 Nxf4 13. Qxf4 O-O 14. g4 g5 15. Qe3 Bg6 16. Ne5 Bxe5 17. dxe5 Qe7 18. f4 gxf4 19. Qxf4 f6 20. Rhf1 Nd7 21. exf6 Nxf6 22. Qe5 Rae8 23. h4 Nd5 24. h5 Nxc3 25. bxc3 Rxf1 26. Rxf1 Bf7 27. Bd3 h6 28. Rf6 Qf8 29. g5 hxg5 30. h6 Qa3+ 31. Kb1 Kf8 32. Rxf7+ Kxf7 33. Qg7# 1-0");
+    });
     
 });
 

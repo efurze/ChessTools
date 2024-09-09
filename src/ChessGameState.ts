@@ -39,6 +39,29 @@ export class ChessGameState {
         return new ChessGameState(meta, boardStates);
     }
 
+    public static fromJSON(pgn: {[key: string]: string}): ChessGameState {
+        const meta: {[key: string]: string} = {};
+        const boardStates: ChessBoardState[] = [ChessBoardState.fromFEN('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')];
+
+        Object.keys(pgn).forEach(function(key) {
+            const value = pgn[key]
+            if (key === "SAN") {
+                meta["SAN"] = value;
+                const moves = ChessGameState.parseMoves(value);
+                for (const move of moves) {
+                    if (move !== '' && move !== '1-0' && move !== '0-1' && move !== '1/2-1/2' && move !== '*') {
+                        boardStates.push(boardStates[boardStates.length - 1].copy().move(move));
+                    }
+                }
+            } else {
+                meta[key] = value;
+            }
+        })
+
+        return new ChessGameState(meta, boardStates);
+    }   
+
+
     public getMeta(key: string): string {
         return this.meta[key];
     } 
