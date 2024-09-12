@@ -55,6 +55,7 @@ class ScriptParams {
 class PositionGenerator {
 
     private static MAX_WORKERS : number = 10;
+    private static CHUNK_SIZE : number = 10;
 
     private params : ScriptParams;
     private fileGenerator : Generator<string>;
@@ -155,19 +156,24 @@ class PositionGenerator {
         if (self.workerCount > PositionGenerator.MAX_WORKERS) {
             return;
         }
-        const file : string | undefined = self.fileGenerator.next().value;
-        if (file) {
-            self.gameCount ++;
+        const files : string[] = []
+        let file : string = "";
+        let count = 0;
+        while(count < PositionGenerator.CHUNK_SIZE && (file = self.fileGenerator.next().value) !== undefined) {  
+            files.push(file);
+            count++;
+        }
+        if (files.length) {
+            self.gameCount += files.length;
             self.workerCount ++;
 
             if (self.gameCount % 10 == 0) {
                 console.log("game " + self.gameCount);
             }
 
-            const baseDir = path.dirname(path.dirname(file));
+            const baseDir = path.dirname(path.dirname(files[0]));
             const worker = new Worker('./dist/process_game_worker.js', {
-              //workerData: { filepath: file, filter: self.filter }
-                workerData: {data:file}
+                workerData: {data:files}
             });
 
             worker.on('message', function(positions : string[]) : void {    
@@ -176,14 +182,7 @@ class PositionGenerator {
                     self.savePosition(position, baseDir);
                 })
              });
-/*
-            worker.on('message', function(positions : string[]) : void {    
-                positions.forEach(function(pos : string) : void {
-                    self.savePosition(PositionInfo.fromString(pos), 
-                        baseDir);
-                });
-            });
-*/
+
             worker.on('exit', function():void {
                 self.workerCount --;
                 self.writer.pump();
@@ -231,7 +230,7 @@ class BufferedWriter {
     }
 
     public writeFile(filepath:string, data:string) : void {
-        //this.buffer.push({filepath: filepath, data: data});
+        this.buffer.push({filepath: filepath, data: data});
         this.pump();
     }
 
@@ -251,6 +250,9 @@ class BufferedWriter {
             const toWrite : {filepath:string, data:string} | undefined = self.buffer.shift();
             if (toWrite) {
                 fsp.writeFile(toWrite.filepath, toWrite.data)
+                    .catch(function(err){
+                        
+                    })
                     .finally(function() {
                         self.pendingWrites--;
                         if (self.done && self.pendingWrites % 100 == 0) {

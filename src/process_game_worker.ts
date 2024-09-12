@@ -120,10 +120,12 @@ function log(msg:string):void {
 }
 
 if (workerData) {
-	const gamefilepath = workerData.data;
-	parentPort.postMessage(processGame(gamefilepath).map(function(p){
-		return p.toString();
-	}));
+	const gamefilepaths = workerData.data;
+	gamefilepaths.forEach(function(filepath:string) {
+			parentPort.postMessage(processGame(filepath).map(function(p){
+				return p.toString();
+			}));		
+	})
 }
 
 
