@@ -20,7 +20,7 @@ import * as fs from 'fs';
 import * as readline from 'readline';
 import * as path from 'path';
 import { Worker } from 'worker_threads';
-//import { PositionInfo } from './process_game_worker';
+import { PositionInfo } from './process_game_worker';
 import * as crypto from 'crypto';
 const fsp = fs.promises;
 
@@ -51,41 +51,6 @@ class ScriptParams {
     }
 }
 
-class PositionInfo {
-    private id : string;
-    private history : {[key:string] : string[]}; // {'nf3' : [gameid, gameid ...], 'e4':[], ...}
-
-    public constructor(id:string, history:{[key:string] : string[]}) {
-        this.id = id;
-        this.history = history;
-    }
-
-    public getId() : string {
-        return this.id;
-    }
-
-    public getHistory() : {[key:string] : string[]} {
-        return this.history;
-    }
-
-    public addGame(move:string, gameId:string) : void {
-        this.history[move] = this.history[move] ?? [];
-        this.history[move].push(gameId);
-    }
-
-    public toString() : string {
-        const obj = {
-            id: this.id,
-            history: this.history
-        };
-        return JSON.stringify(obj);
-    }
-
-    public static fromString(data : string) : PositionInfo {
-        const obj = JSON.parse(data);
-        return new PositionInfo(obj.id, obj.history);
-    }
-}
 
 class PositionGenerator {
 

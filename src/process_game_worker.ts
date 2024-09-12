@@ -119,10 +119,12 @@ function log(msg:string):void {
 	process.stdout.write(msg + '\n');
 }
 
-const gamefilepath = workerData.data;
-parentPort.postMessage(processGame(gamefilepath).map(function(p){
-	return p.toString();
-}));
+if (workerData) {
+	const gamefilepath = workerData.data;
+	parentPort.postMessage(processGame(gamefilepath).map(function(p){
+		return p.toString();
+	}));
+}
 
 
 
