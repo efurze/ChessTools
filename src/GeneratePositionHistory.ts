@@ -1,15 +1,26 @@
 /*
     ImportPGN
 
-    USAGE: node GeneratePositionHistory.js outputdir/
+    USAGE: node GeneratePositionHistory.js [filter.json] outputdir/
 
-    This will create outputdir/positions, creating outputdir/ if neccessary. It assumes games are in outputdir/games
+    This will create outputdir/positions, creating outputdir/ if neccessary. 
+    It assumes games are in outputdir/games.
+
+    filter.json is an optional file which has the following format:
+    {
+        <positionID> : count,
+        <positionID> : count,
+        ...
+    }
+
+    The <count> is irrelevant to this script, but it will ignore any positionID that isn't in the file.
 */
 
 import * as fs from 'fs';
 import * as readline from 'readline';
 import * as path from 'path';
-import { ChessGameState } from './ChessGameState';
+import { Worker } from 'worker_threads';
+//import { PositionInfo } from './process_game_worker';
 import * as crypto from 'crypto';
 const fsp = fs.promises;
 
@@ -17,26 +28,75 @@ const GAME_DIR : string = "games";
 const POSITION_DIR : string = "positions";
 let INITIAL_IMPORT : boolean = false;
 
+//500 to 3500 took 2:20
+//    to 9500 took 8:10
+//    to 25500 took 26:00
+//    to 36500 took 1:20:00
 class ScriptParams {
 
     private output: string;
+    private filter: string;
    
-    public constructor(outputDir: string) {
+    public constructor(filterFile: string, outputDir: string) {
+        this.filter = filterFile;
         this.output = outputDir;
     }
 
     public outputDir() : string {
         return this.output;
     }
+
+    public filterFile() : string {
+        return this.filter;
+    }
 }
 
+class PositionInfo {
+    private id : string;
+    private history : {[key:string] : string[]}; // {'nf3' : [gameid, gameid ...], 'e4':[], ...}
+
+    public constructor(id:string, history:{[key:string] : string[]}) {
+        this.id = id;
+        this.history = history;
+    }
+
+    public getId() : string {
+        return this.id;
+    }
+
+    public getHistory() : {[key:string] : string[]} {
+        return this.history;
+    }
+
+    public addGame(move:string, gameId:string) : void {
+        this.history[move] = this.history[move] ?? [];
+        this.history[move].push(gameId);
+    }
+
+    public toString() : string {
+        const obj = {
+            id: this.id,
+            history: this.history
+        };
+        return JSON.stringify(obj);
+    }
+
+    public static fromString(data : string) : PositionInfo {
+        const obj = JSON.parse(data);
+        return new PositionInfo(obj.id, obj.history);
+    }
+}
 
 class PositionGenerator {
+
+    private static MAX_WORKERS : number = 10;
 
     private params : ScriptParams;
     private fileGenerator : Generator<string>;
     private writer : BufferedWriter;
+    private filter : {[key:string] : number} | undefined = undefined;
     private gameCount : number = 0;
+    private workerCount : number = 0;
     private readAllGames : boolean = false;
 
     public constructor() {
@@ -85,67 +145,33 @@ class PositionGenerator {
         }
     }
 
+    private loadFilter(filterFile: string) : void {
+        try {
+            this.filter = JSON.parse(fs.readFileSync(filterFile).toString());
+        } catch (err) {
+            this.filter = undefined;
+        }
+    }
+
     private readArgs(): ScriptParams {
         const args = process.argv.slice(2); // first 2 args are node and this file
         if (args.length < 1) {
-            console.log("Not enough parameters. USAGE: node GeneratePositionHistories.js outputdir/");
+            console.log("Not enough parameters. USAGE: node GeneratePositionHistories.js [filter.json] outputdir/");
             process.exit(1);
         }
 
-        const params = new ScriptParams(args[0]);
+        const params = args.length > 1  
+                            ? new ScriptParams(args[0], args[1])
+                            : new ScriptParams("", args[0]);
         return params;
     }
 
-     private loadPosition(posId : string, baseDir : string) : {[key:string] : string[]}  {
-        const filePath = path.join(baseDir, POSITION_DIR, posId.slice(0,2));
-        const fileName = posId.slice(2);
-        let data : string = "{}";
-        try {
-            const b : Buffer =  fs.readFileSync(path.join(filePath, fileName));
-            data = b ? b.toString() : "{}";
-            return JSON.parse(data);
-        } catch (err) {
-            //console.log(err);
-        }
-        return {};
+
+     private savePosition(pos : PositionInfo, baseDir : string) : void {
+        const filePath = path.join(baseDir, POSITION_DIR, pos.getId().slice(0,2), pos.getId().slice(2));
+        this.writer.writeFile(filePath, JSON.stringify(pos.getHistory(), null, " "));
     }
 
-
-     private savePosition(history : {[key:string] : string[]}, posId : string, baseDir : string) : void {
-        const filePath = path.join(baseDir, POSITION_DIR, posId.slice(0,2));
-        //console.log(filePath);
-        this.writer.writeFile(filePath, posId.slice(2), JSON.stringify(history, null, " "));
-    }
-
-
-     private updatePositionsForGame(game : ChessGameState, gameId : string, baseDir : string) : void {
-        const self = this;
-        try {
-            const moves = ChessGameState.parseMoves(game.getMeta("SAN"));
-            const positions = game.getBoardStates();
-            for (let i=0; i < positions.length-1; i++) { // no move is made in the last position
-                const posId = positions[i].toBase64();
-
-                /*
-                    If we just created the directory then we know that loadPosition
-                    will always fail, so just create an empty object. This speeds
-                    the import up a lot.
-                */
-                const outData : {[key:string] : string[]} 
-                    = INITIAL_IMPORT ? {} : self.loadPosition(posId, baseDir);
-
-                // check if we've already added this game to this position
-                if (!JSON.stringify(outData).includes(gameId)) {
-                    // add this gameId to the position history
-                    outData[moves[i]] = outData[moves[i]] ?? [];
-                    outData[moves[i]].push(gameId);
-                    self.savePosition(outData, posId, baseDir);
-                } 
-            }
-        } catch (err) {
-            console.log(err);
-        }
-    }
 
     private * enumerateFiles(dir : string) : Generator<string> {
       for (const entry of fs.readdirSync(dir)) {
@@ -159,33 +185,52 @@ class PositionGenerator {
     }
 
     
-
     public readAnotherGame() : void {
         const self = this;
+        if (self.workerCount > PositionGenerator.MAX_WORKERS) {
+            return;
+        }
         const file : string | undefined = self.fileGenerator.next().value;
         if (file) {
-            try {
-                const data : Buffer = fs.readFileSync(file);
-                const game = ChessGameState.fromJSON(JSON.parse(data.toString()));
+            self.gameCount ++;
+            self.workerCount ++;
 
-                const enclosingDir : string = path.basename(path.dirname(file));
-                const fileName : string = path.basename(file);
-                
-                self.updatePositionsForGame(game, enclosingDir + fileName, self.params.outputDir());
-                if (++self.gameCount % 10 == 0) {
-                    console.error("game " + self.gameCount);
-                }
-            } catch (err) {
-                console.log(err);
-                console.log(file);
+            if (self.gameCount % 10 == 0) {
+                console.log("game " + self.gameCount);
             }
 
+            const baseDir = path.dirname(path.dirname(file));
+            const worker = new Worker('./dist/process_game_worker.js', {
+              //workerData: { filepath: file, filter: self.filter }
+                workerData: {data:file}
+            });
+
+            worker.on('message', function(positions : string[]) : void {    
+                positions.forEach(function(pos:string) {
+                    const position = PositionInfo.fromString(pos);
+                    self.savePosition(position, baseDir);
+                })
+             });
+/*
+            worker.on('message', function(positions : string[]) : void {    
+                positions.forEach(function(pos : string) : void {
+                    self.savePosition(PositionInfo.fromString(pos), 
+                        baseDir);
+                });
+            });
+*/
+            worker.on('exit', function():void {
+                self.workerCount --;
+                self.writer.pump();
+            });
+            
         } else {
             self.readAllGames = true;
             console.log("end of input");
             self.writer.dataDone();
         }
     }
+    
 
     public run(): void {
         const self = this;
@@ -220,16 +265,12 @@ class BufferedWriter {
         this.pump();
     }
 
-    public writeFile(dir:string, file:string, data:string) : void {
-        this.buffer.push({
-            filepath: path.join(dir, file),
-            data: data
-        });
-
+    public writeFile(filepath:string, data:string) : void {
+        //this.buffer.push({filepath: filepath, data: data});
         this.pump();
     }
 
-    private pump() : void {
+    public pump() : void {
         const self = this;
         setTimeout(function(){self.doPump();}, 0);
     }
@@ -253,6 +294,10 @@ class BufferedWriter {
                         self.pump();
                     });
             }
+        } else if (!self.done && !self.buffer.length) {
+            //console.log("buffer underrun");
+        } else if (!self.done && self.pendingWrites >= BufferedWriter.MAX_PENDING) {
+            //console.log("At max filehandles");
         }
         
     }
