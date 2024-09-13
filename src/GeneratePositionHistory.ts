@@ -122,10 +122,20 @@ class PositionGenerator {
     }
 
     private loadFilter(filterFile: string) : void {
+        const self = this;
         try {
-            this.filter = JSON.parse(fs.readFileSync(filterFile).toString());
+            self.filter = JSON.parse(fs.readFileSync(filterFile).toString());
+            if (self.filter) {
+                // prune out all the positions that occur > 50k times. This eliminates
+                // stuff like the starting position or 1. e4
+                Object.keys(self.filter).forEach(function(posId:string) {
+                    if (self.filter && self.filter[posId] > 50000) {
+                        delete self.filter[posId];
+                    }
+                })
+            }
         } catch (err) {
-            this.filter = undefined;
+            self.filter = undefined;
         }
     }
 
