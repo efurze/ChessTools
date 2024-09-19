@@ -52,7 +52,7 @@ class ScriptParams {
 
 class PositionGenerator {
 
-    private static MAX_WORKERS : number = 10;
+    private static MAX_WORKERS : number = 2;
 
     private params : ScriptParams;
     private fileGenerator : Generator<string>;
@@ -165,7 +165,7 @@ class PositionGenerator {
         if (!this.readAllGames) {
             this.readAnotherGame();
         } else if (!this.gamesPending) {
-            this.terminateWorkers();
+            //this.terminateWorkers();
         }
     }
 
@@ -181,23 +181,34 @@ class PositionGenerator {
         })
     }
 
+    private sendOfData() : void {
+        this.workers.forEach(function(worker) {
+            worker.postMessage({cmd: "save"});
+        })
+    }
+
 
     public readAnotherGame() : void {
         const self = this;
         
+        if (self.readAllGames) {
+            return;
+        }
+
         let file : string = "";
         file = self.fileGenerator.next().value;
         if (file) {
             self.gamesPending ++;
             self.currentWorker ++;
             self.currentWorker %= PositionGenerator.MAX_WORKERS;
-            self.workers[self.currentWorker].postMessage({data: [file]});
+            self.workers[self.currentWorker].postMessage({cmd: "game", data: [file]});
             
         } else {
             self.readAllGames = true;
             console.log("**** end of input");
+            self.sendOfData();
             if (!self.gamesPending) {
-                self.terminateWorkers();
+                //self.terminateWorkers();
             }
         }
     }

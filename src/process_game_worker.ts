@@ -8,6 +8,7 @@ const fsp = fs.promises;
 const POSITION_DIR = "positions";
 
 let positionFilter : {[key:string] : boolean} | undefined = undefined;
+let endOfData : boolean = false;
 let baseDir : string = "";
 
 class PositionInfo {
@@ -83,6 +84,38 @@ async function savePositions(positions : PositionInfo[]) : Promise<void> {
 		}));
 }
 
+async function flushToDisk() : Promise<void> {
+	const ids = Object.keys(PositionCache);
+	const toWrite : PositionInfo[] = [];
+	let batchSize = 0;
+	while (ids.length && batchSize++ < 100) {
+		toWrite.push(PositionCache[ids[0]]);
+		ids.shift();
+	}
+
+	if (toWrite.length) {
+		log("writing " + ids.length + " positions");
+		
+		try {
+			await Promise.all(toWrite.map(function(pos) {
+				const filePath = path.join(baseDir, POSITION_DIR, pos.getId().slice(0,2), pos.getId().slice(2));
+				delete PositionCache[pos.getId()];
+				return fsp.writeFile(filePath, JSON.stringify(pos.getHistory(), null, " "));
+			}))
+
+		} catch (err) {
+
+		}
+
+		flushToDisk();
+
+	} else {
+		process.exit();
+	}
+}
+
+const PositionCache : {[key:string]:PositionInfo} = {};
+
 function updatePositionsForGame(game : ChessGameState, 
 								gameId : string, 
 								baseDir : string) : PositionInfo[]  {
@@ -98,13 +131,14 @@ function updatePositionsForGame(game : ChessGameState,
                 continue;
             }
             
-            const outData : PositionInfo = loadPosition(posId, baseDir);
+            const outData = PositionCache[posId] ?? new PositionInfo(posId, {});
             
 
             // check if we've already added this game to this position
             if (!JSON.stringify(outData.getHistory()).includes(gameId)) {
                 // add this gameId to the position history
                 outData.addGame(moves[i], gameId);
+                PositionCache[posId] = outData;
                 ret.push(outData);
             } 
         }
@@ -114,6 +148,8 @@ function updatePositionsForGame(game : ChessGameState,
 
     return ret;
 }
+
+
 
 function processGame(filepath : string) : PositionInfo[]  {
 	let ret : PositionInfo[] = [];
@@ -135,17 +171,26 @@ function log(msg:string):void {
 	process.stdout.write(msg + '\n');
 }
 
-async function onMessage(msg : {[key:string]:string[]}) : Promise<void> {
-	const gamefilepaths = msg.data;
-	let positions : PositionInfo[] = [];
-	//log("worker got " + gamefilepaths[0]);
+async function onMessage(msg : {cmd: string, data:string[]}) : Promise<void> {
 
-	gamefilepaths.forEach(function(filepath:string) {
-		positions = positions.concat(processGame(filepath));
-	})
+	if (msg.cmd === "game") {
+		const gamefilepaths = msg.data;
+		//log("worker got " + gamefilepaths[0]);
 
-	await savePositions(positions);	
-	parentPort.postMessage("more data");
+		gamefilepaths.forEach(function(filepath:string) {
+			processGame(filepath)
+		})
+
+	} else if (msg.cmd === "save") {
+		const ids = Object.keys(PositionCache);
+		log("Got end of data " + ids.length);
+		endOfData = true;
+		flushToDisk();
+	}
+
+	if (!endOfData) {
+		parentPort.postMessage("more data");
+	}
 };
 
 
