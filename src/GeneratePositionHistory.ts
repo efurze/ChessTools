@@ -269,7 +269,7 @@ class BufferedWriter {
         setTimeout(function(){self.doPump();}, 0);
     }
 
-    private doPump() : void {
+    private async doPump() : Promise<void> {
         const self = this;
         //console.log("doPump", "buffer:", this.buffer.length, "pending:", this.pendingWrites);
         if (self.buffer.length < BufferedWriter.MAX_BUFFER && !self.done) {
@@ -279,18 +279,19 @@ class BufferedWriter {
             self.pendingWrites++;
             const toWrite : {filepath:string, data:string} | undefined = self.buffer.shift();
             if (toWrite) {
-                fsp.writeFile(toWrite.filepath, toWrite.data)
-                    .catch(function(err){
+                try {
+                    await fsp.writeFile(toWrite.filepath, toWrite.data);
+                } catch (err) {
 
-                    })
-                    .finally(function() {
-                        self.pendingWrites--;
-                        self.writeCount++;
-                        if (self.done && self.pendingWrites % 100 == 0) {
-                            //console.log(self.pendingWrites + " files left to write.");
-                        }
-                        self.pump();
-                    });
+                } finally {
+                    self.pendingWrites--;
+                    self.writeCount++;
+                    if (self.done && self.pendingWrites % 100 == 0) {
+                        //console.log(self.pendingWrites + " files left to write.");
+                    }
+                    self.pump();
+                }
+                
             }
         } else if (!self.done && !self.buffer.length) {
             //console.log("buffer underrun");
