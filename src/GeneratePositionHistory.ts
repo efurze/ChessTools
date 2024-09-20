@@ -53,22 +53,26 @@ class PositionGenerator {
 
     private static MAX_WORKERS : number = 20;
     private static MAX_GAMES_PENDING : number = 100;
+    private static MAX_FILEHANDLES : number = 20;
 
     private params : ScriptParams;
     private fileGenerator : Generator<string>;
-    private writer : BufferedWriter;
+    //private writer : BufferedWriter;
     private filter : {[key:string] : number} | undefined = undefined;
     private gameCount : number = 0;
     private gamesPending : number = 0; // # of games we're waiting for the workers to finish
     private currentWorker : number = 0; // round-robin pointer
     private workers : Worker[] = [];
     private readAllGames : boolean = false;
+    private positionCache : {[id:string]:PositionInfo} = {};
+    private posIdsToWrite : string[] = [];
+    private flushed = false;
 
     public constructor() {
         this.params = this.readArgs();
         this.fileGenerator = this.enumerateFiles(path.join(this.params.outputDir(), 
                                                             GAME_DIR));
-        this.writer = new BufferedWriter(this.readAnotherGame.bind(this));
+        //this.writer = new BufferedWriter(this.readAnotherGame.bind(this));
     }
 
     private generateBase64Characters(): string[] {
@@ -142,13 +146,50 @@ class PositionGenerator {
         return params;
     }
 
-
-     private savePosition(pos : PositionInfo) : void {
+/*
+    private savePosition(pos : PositionInfo) : void {
         const baseDir = this.params.outputDir();
         const filePath = path.join(baseDir, POSITION_DIR, pos.getId().slice(0,2), pos.getId().slice(2));
         this.writer.writeFile(filePath, JSON.stringify(pos.getHistory(), null, " "));
     }
+*/
 
+    private cachePosition(pos : PositionInfo) : void {
+        if (pos.getId() in this.positionCache) {
+            this.positionCache[pos.getId()].merge(pos);
+        } else {
+            this.positionCache[pos.getId()] = pos;
+        }
+
+    }
+
+    private flushCache() : void {
+        if (!this.flushed) {
+            this.flushed = true;
+            this.pruneCache();
+            this.posIdsToWrite = Object.keys(this.positionCache);
+            for (let i=0; i < PositionGenerator.MAX_FILEHANDLES; i++) {
+                this.writePosition();
+            }
+        }
+    }
+
+    private async writePosition() : Promise<void> {
+        const self = this;
+        if (self.posIdsToWrite.length) {
+            if (self.posIdsToWrite.length % 100 == 0) {
+                console.log(self.posIdsToWrite.length + " positions left to write");
+            }
+            const id = self.posIdsToWrite.shift();
+            const pos = self.positionCache[id!];
+            delete self.positionCache[id!];
+            const baseDir = self.params.outputDir();
+            const filePath = path.join(baseDir, POSITION_DIR, pos.getId().slice(0,2), pos.getId().slice(2));
+            await fsp.writeFile(filePath, JSON.stringify(pos.getHistory(), null, " "));
+
+            self.writePosition();
+        }
+    }
 
     private * enumerateFiles(dir : string) : Generator<string> {
       for (const entry of fs.readdirSync(dir)) {
@@ -171,14 +212,33 @@ class PositionGenerator {
 
         self.gameCount ++;
         if (self.gameCount % 100 == 0) {
-            console.error("game " + self.gameCount + " processed, positions written: " + self.writer.written());
+            console.error("game " + self.gameCount);
         }
         
         positions.forEach(function(pos:string) {
             const position = PositionInfo.fromString(pos);
-            self.savePosition(position);
+            self.cachePosition(position);
         })
-        self.shutDownIfDone();
+
+        if (self.gameCount % 50000 == 0) {
+            self.pruneCache();
+        }
+
+        if (!self.readAllGames) {
+            self.readAnotherGame();
+        } else if (!self.gamesPending) {
+            self.shutDownIfDone();
+        }
+    }
+
+    private pruneCache() : void {
+        const self = this;
+        const ids = Object.keys(self.positionCache);
+        ids.forEach(function(id) {
+            if (self.positionCache[id].getGameCount() < 3) {
+                delete self.positionCache[id];
+            }
+        })
     }
 
     private workerError(msg : string) : void {
@@ -193,13 +253,14 @@ class PositionGenerator {
             this.workers.forEach(function(worker : Worker) {
                 worker.terminate();
             })
+            this.flushCache();
         }
     }
 
     public readAnotherGame() : void {
         const self = this;
         
-        if (self.gamesPending > PositionGenerator.MAX_GAMES_PENDING) {
+        if (self.gamesPending > PositionGenerator.MAX_GAMES_PENDING || self.readAllGames) {
             return;
         }
 
@@ -214,7 +275,7 @@ class PositionGenerator {
         } else {
             self.readAllGames = true;
             console.log("**** end of input", self.gamesPending + " games still to process");
-            self.writer.dataDone();
+            //self.writer.dataDone();
             self.shutDownIfDone();
         }
     }
@@ -226,16 +287,19 @@ class PositionGenerator {
         self.initializeOutputDirectory(self.params.outputDir());
         self.loadFilter(self.params.filterFile());
         self.initializeWorkers();
-        self.writer.start();
+        for (let i=0; i < PositionGenerator.MAX_WORKERS; i++) {
+            self.readAnotherGame();
+        }
     }
 
 } // class PositionGenerator
 
+/*
 class BufferedWriter {
 
     
     // This limits the number of open file descriptors
-    private static MAX_PENDING : number = 500;
+    private static MAX_PENDING : number = 10;
     private static MAX_BUFFER : number = 1000;
     private pendingWrites : number = 0;
     private buffer : {filepath:string, data:string}[] = [];
@@ -261,7 +325,14 @@ class BufferedWriter {
 
     public writeFile(filepath:string, data:string) : void {
         this.buffer.push({filepath: filepath, data: data});
-        this.pump();
+        //this.pump();
+    }
+
+    public beginWrite() {
+        console.log("beginWrite: " + this.buffer.length);
+        for (let i=0; i < BufferedWriter.MAX_PENDING; i++) {
+            this.doPump();
+        }
     }
 
     public pump() : void {
@@ -271,36 +342,30 @@ class BufferedWriter {
 
     private async doPump() : Promise<void> {
         const self = this;
-        //console.log("doPump", "buffer:", this.buffer.length, "pending:", this.pendingWrites);
-        if (self.buffer.length < BufferedWriter.MAX_BUFFER && !self.done) {
-            self.requestMoreDataCB();
-        }
         if (self.buffer.length && self.pendingWrites < BufferedWriter.MAX_PENDING) {
             self.pendingWrites++;
             const toWrite : {filepath:string, data:string} | undefined = self.buffer.shift();
             if (toWrite) {
                 try {
+                    console.log("writing " + toWrite.filepath);
                     await fsp.writeFile(toWrite.filepath, toWrite.data);
                 } catch (err) {
 
                 } finally {
                     self.pendingWrites--;
                     self.writeCount++;
-                    if (self.done && self.pendingWrites % 100 == 0) {
-                        //console.log(self.pendingWrites + " files left to write.");
+                    if (self.done && self.buffer.length % 100 == 0) {
+                        console.log(self.buffer.length + " files left to write.");
                     }
                     self.pump();
                 }
                 
             }
-        } else if (!self.done && !self.buffer.length) {
-            //console.log("buffer underrun");
-        } else if (!self.done && self.pendingWrites >= BufferedWriter.MAX_PENDING) {
-            //console.log("At max filehandles");
-        }
+        } 
         
     }
 }
+*/
 
 console.log("Starting");
 new PositionGenerator().run();

@@ -12,14 +12,30 @@ let positionFilter : {[key:string] : boolean} | undefined = undefined;
 export class PositionInfo {
 	private id : string;
 	private history : {[key:string] : string[]}; // {'nf3' : [gameid, gameid ...], 'e4':[], ...}
+	private gameCount : number = 0;
 
 	public constructor(id:string, history:{[key:string] : string[]}) {
 		this.id = id;
 		this.history = history;
 	}
 
+	public merge(other : PositionInfo) : void {
+		const self = this;
+		const otherHistory = other.getHistory();
+		Object.keys(otherHistory).forEach(function(move) {
+			self.history[move] = self.history[move] ?? [];
+			self.history[move] = self.history[move].concat(otherHistory[move]);
+		})
+
+		self.gameCount += other.getGameCount();
+	}
+
 	public getId() : string {
 		return this.id;
+	}
+
+	public getGameCount() : number {
+		return this.gameCount;
 	}
 
 	public getHistory() : {[key:string] : string[]} {
@@ -29,6 +45,7 @@ export class PositionInfo {
 	public addGame(move:string, gameId:string) : void {
 		this.history[move] = this.history[move] ?? [];
 		this.history[move].push(gameId);
+		this.gameCount ++;
 	}
 
 	public toString() : string {
@@ -76,7 +93,7 @@ function updatePositionsForGame(game : ChessGameState,
             }
             
             const outData : PositionInfo
-                = INITIAL_IMPORT ? new PositionInfo(posId, {}) : loadPosition(posId, baseDir);
+                = new PositionInfo(posId, {}) ;//: loadPosition(posId, baseDir);
             
 
             // check if we've already added this game to this position
