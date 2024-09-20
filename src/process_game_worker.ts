@@ -14,8 +14,9 @@ export class PositionInfo {
 	private history : {[key:string] : string[]}; // {'nf3' : [gameid, gameid ...], 'e4':[], ...}
 	private gameCount : number = 0;
 
-	public constructor(id:string, history:{[key:string] : string[]}) {
+	public constructor(id:string, history:{[key:string] : string[]}, gameCount:number = 0) {
 		this.id = id;
+		this.gameCount = gameCount;
 		this.history = history;
 	}
 
@@ -51,6 +52,7 @@ export class PositionInfo {
 	public toString() : string {
 		const obj = {
 			id: this.id,
+			gameCount: this.gameCount,
 			history: this.history
 		};
 		return JSON.stringify(obj);
@@ -58,7 +60,7 @@ export class PositionInfo {
 
 	public static fromString(data : string) : PositionInfo {
 		const obj = JSON.parse(data);
-		return new PositionInfo(obj.id, obj.history);
+		return new PositionInfo(obj.id, obj.history, obj.gameCount);
 	}
 }
 
@@ -84,7 +86,7 @@ function updatePositionsForGame(game : ChessGameState,
     try {
         const moves = ChessGameState.parseMoves(game.getMeta("SAN"));
         const positions = game.getBoardStates();
-        for (let i=0; i < positions.length-1; i++) { // no move is made in the last position
+        for (let i=1; i < positions.length-1; i++) { // no move is made in the last position, and we want to ignore the start position
             const posId = positions[i].toBase64();
             
             if (positionFilter && !positionFilter[posId]) {
@@ -93,7 +95,7 @@ function updatePositionsForGame(game : ChessGameState,
             }
             
             const outData : PositionInfo
-                = new PositionInfo(posId, {}) ;//: loadPosition(posId, baseDir);
+                = new PositionInfo(posId, {}); //: loadPosition(posId, baseDir);
             
 
             // check if we've already added this game to this position
@@ -104,7 +106,7 @@ function updatePositionsForGame(game : ChessGameState,
             } 
         }
     } catch (err) {
-        log(JSON.stringify(err));
+        log("updatePositionsForGame ERROR: " + JSON.stringify(err));
     }
 
     return ret;
