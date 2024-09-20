@@ -164,13 +164,32 @@ class PositionGenerator {
     }
 
     private flushCache() : void {
-        if (!this.flushed) {
-            this.flushed = true;
-            this.pruneCache();
+        const self = this;
+
+        if (!self.flushed) {
+            self.flushed = true;
+            
+            // do a final prune
+            const ids = Object.keys(self.positionCache);
+            ids.forEach(function(id) {
+                if (self.positionCache[id].getGameCount() < 50) {
+                    delete self.positionCache[id];
+                } else if (self.positionCache[id].getGameCount() > 500000) {
+                    // prune the starting pos
+                    delete self.positionCache[id];
+                }
+            })
+
+            // write
+            console.log("saving...")
+            const baseDir = self.params.outputDir();
+            fs.writeFileSync(path.join(baseDir,"positionHistory.json"), JSON.stringify(self.positionCache, null, " "));
+            /*
             this.posIdsToWrite = Object.keys(this.positionCache);
             for (let i=0; i < PositionGenerator.MAX_FILEHANDLES; i++) {
                 this.writePosition();
             }
+            */
         }
     }
 
@@ -284,8 +303,8 @@ class PositionGenerator {
     public run(): void {
         const self = this;
         console.log("Initializing destination directory");
-        self.initializeOutputDirectory(self.params.outputDir());
-        self.loadFilter(self.params.filterFile());
+        //self.initializeOutputDirectory(self.params.outputDir());
+        //self.loadFilter(self.params.filterFile());
         self.initializeWorkers();
         for (let i=0; i < PositionGenerator.MAX_WORKERS; i++) {
             self.readAnotherGame();
