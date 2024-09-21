@@ -20,16 +20,16 @@ class ScriptParams {
     private input : string;
     private output: string;
    
-    public constructor(inputFile: string, outputDir: string) {
+    public constructor(inputFile: string, outputFile: string) {
         this.input = inputFile;
-        this.output = outputDir;
+        this.output = outputFile;
     }
 
     public inputFile() : string {
         return this.input;
     }
 
-    public outputDir() : string {
+    public outputFile() : string {
         return this.output;
     }
 }
@@ -56,9 +56,14 @@ function readArgs(): ScriptParams {
 }
 
 
-async function importGame(data : string[], baseDir : string) : Promise<void> {
+async function importGame(data : string[], outFile : string) : Promise<void> {
     try {
-        const game = ChessGameState.fromPGN(data.join('\n'));
+        const joinedData = data.join('\n');
+        if (joinedData.includes("Chess960") || joinedData.includes("Fisher Random") 
+            || joinedData.includes("Fischer Random") || joinedData.includes("Freestyle Chess")) {
+            return;
+        }
+        const game = ChessGameState.fromPGN(joinedData);
         const moves = ChessGameState.parseMoves(game.getMeta("SAN"));
 
         // filename is 64-bit hash of the move sequence
@@ -74,11 +79,15 @@ async function importGame(data : string[], baseDir : string) : Promise<void> {
          })
          // Save game file. Files are sharded by splitting the first 2 bytes of the hash
          // 'e8e7c50fbff3c046' => 'e8/e7c50fbff3c046'
+         /*
          await fsp.writeFile(path.join(baseDir, 
                                         GAME_DIR, 
                                         hash.slice(0,2), 
                                         hash.slice(2)), 
                             JSON.stringify(outdata, null, " ")); 
+        */
+
+         await fsp.appendFile(outFile, `"${hash}":${JSON.stringify(outdata)},\n`);
 
     } catch (err) {
         console.log(err);
@@ -88,7 +97,7 @@ async function importGame(data : string[], baseDir : string) : Promise<void> {
 
 async function doImport(): Promise<void> {
     const params = readArgs();
-    initializeOutputDirectory(params.outputDir());
+    //initializeOutputDirectory(params.outputDir());
     
     const fileStream = fs.createReadStream(params.inputFile());  // Use createReadStream from 'fs'
 
@@ -97,13 +106,15 @@ async function doImport(): Promise<void> {
         crlfDelay: Infinity,  // Handle both Windows and Unix-style line breaks
     });
 
+    await fsp.appendFile(params.outputFile(), "{");
+
     let buffer : string[] = [];
     let gamecount : number = 0;
     // Read the file line by line
     for await (const line of rl) {
         buffer.push(line);
         if (line.trim().startsWith("1.")) {
-            await importGame(buffer, params.outputDir());
+            await importGame(buffer, params.outputFile());
             buffer = [];
             gamecount++;
             if (gamecount % 10 == 0) {
@@ -112,6 +123,9 @@ async function doImport(): Promise<void> {
             
         }
     }
+
+    await fsp.appendFile(params.outputFile(), "}");
+
 }
 
 doImport();
