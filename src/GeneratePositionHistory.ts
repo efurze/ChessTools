@@ -31,16 +31,26 @@ let INITIAL_IMPORT : boolean = false;
 
 class ScriptParams {
 
-    private output: string;
-    private filter: string;
+    private games_dir : string;
+    private output_file : string;
+    private filter : string;
    
-    public constructor(filterFile: string, outputDir: string) {
+    public constructor(filterFile: string, gamesDir: string, outputFile: string) {
         this.filter = filterFile;
-        this.output = outputDir;
+        this.output_file = outputFile;
+        this.games_dir = gamesDir;
+    }
+
+    public gamesDir() : string {
+        return this.games_dir;
     }
 
     public outputDir() : string {
-        return this.output;
+        return "";
+    }
+
+    public outputFile() : string {
+        return this.output_file;
     }
 
     public filterFile() : string {
@@ -70,8 +80,7 @@ class PositionGenerator {
 
     public constructor() {
         this.params = this.readArgs();
-        this.fileGenerator = this.enumerateFiles(path.join(this.params.outputDir(), 
-                                                            GAME_DIR));
+        this.fileGenerator = this.enumerateFiles(this.params.gamesDir());
         //this.writer = new BufferedWriter(this.readAnotherGame.bind(this));
     }
 
@@ -135,14 +144,14 @@ class PositionGenerator {
 
     private readArgs(): ScriptParams {
         const args = process.argv.slice(2); // first 2 args are node and this file
-        if (args.length < 1) {
-            console.log("Not enough parameters. USAGE: node GeneratePositionHistories.js [filter.json] outputdir/");
+        if (args.length < 2) {
+            console.log("Not enough parameters. USAGE: node GeneratePositionHistories.js [filter.json] gamesdir/ output.json");
             process.exit(1);
         }
 
-        const params = args.length > 1  
-                            ? new ScriptParams(args[0], args[1])
-                            : new ScriptParams("", args[0]);
+        const params = args.length > 2  
+                            ? new ScriptParams(args[0], args[1], args[2])
+                            : new ScriptParams("", args[0], args[1]);
         return params;
     }
 
@@ -182,8 +191,7 @@ class PositionGenerator {
 
             // write
             console.log("saving...")
-            const baseDir = self.params.outputDir();
-            fs.writeFileSync(path.join(baseDir,"positionHistory.json"), JSON.stringify(self.positionCache, null, " "));
+            fs.writeFileSync(self.params.outputFile(), JSON.stringify(self.positionCache, null, " "));
             /*
             this.posIdsToWrite = Object.keys(this.positionCache);
             for (let i=0; i < PositionGenerator.MAX_FILEHANDLES; i++) {
@@ -231,7 +239,7 @@ class PositionGenerator {
 
         self.gameCount ++;
         if (self.gameCount % 100 == 0) {
-            console.error("game " + self.gameCount);
+            console.error("game " + self.gameCount, new Date(Date.now()).toLocaleTimeString('en-US'));
         }
         
         positions.forEach(function(pos:string) {
@@ -302,7 +310,7 @@ class PositionGenerator {
 
     public run(): void {
         const self = this;
-        console.log("Initializing destination directory");
+        //console.log("Initializing destination directory");
         //self.initializeOutputDirectory(self.params.outputDir());
         //self.loadFilter(self.params.filterFile());
         self.initializeWorkers();

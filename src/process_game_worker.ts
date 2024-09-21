@@ -84,7 +84,7 @@ function updatePositionsForGame(game : ChessGameState,
     try {
         const moves = ChessGameState.parseMoves(game.getMeta("SAN"));
         const positions = game.getBoardStates();
-        for (let i=1; i < positions.length-1; i++) { // no move is made in the last position, and we want to ignore the start position
+        for (let i=2; i < positions.length-1; i++) { // no move is made in the last position, and we want to ignore the start position
             const posId = positions[i].toBase64();
             
             if (positionFilter && !positionFilter[posId]) {
