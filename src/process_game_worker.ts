@@ -13,9 +13,11 @@ export class PositionInfo {
 	private id : string;
 	private history : {[key:string] : string[]}; // {'nf3' : [gameid, gameid ...], 'e4':[], ...}
 	private gameCount : number = 0;
+	private fen : string = "";
 
-	public constructor(id:string, history:{[key:string] : string[]}, gameCount:number = 0) {
+	public constructor(id:string, history:{[key:string] : string[]}, fen: string, gameCount:number = 0) {
 		this.id = id;
+		this.fen = fen;
 		this.gameCount = gameCount;
 		this.history = history;
 	}
@@ -29,6 +31,14 @@ export class PositionInfo {
 		})
 
 		self.gameCount += other.getGameCount();
+	}
+
+	public setFEN(fen : string) : void {
+		this.fen = fen;
+	}
+
+	public getFEN() : string {
+		return this.fen;
 	}
 
 	public getId() : string {
@@ -52,6 +62,7 @@ export class PositionInfo {
 	public toString() : string {
 		const obj = {
 			id: this.id,
+			fen: this.fen,
 			gameCount: this.gameCount,
 			history: this.history
 		};
@@ -60,24 +71,11 @@ export class PositionInfo {
 
 	public static fromString(data : string) : PositionInfo {
 		const obj = JSON.parse(data);
-		return new PositionInfo(obj.id, obj.history, obj.gameCount);
+		const ret = new PositionInfo(obj.id, obj.history, obj.fen, obj.gameCount);
+		return ret;
 	}
 }
 
-function loadPosition(posId : string, baseDir : string) : PositionInfo  {
-        const filePath = path.join(baseDir, POSITION_DIR, posId.slice(0,2));
-        const fileName = posId.slice(2);
-        let ret : PositionInfo = new PositionInfo("", {});
-        let data : string = "{}";
-        try {
-            const b : Buffer =  fs.readFileSync(path.join(filePath, fileName));
-            data = b ? b.toString() : "{}";
-            ret = new PositionInfo(posId, JSON.parse(data));
-        } catch (err) {
-            //console.log(err);
-        }
-        return ret;
-    }
 
 function updatePositionsForGame(game : ChessGameState, 
 								gameId : string, 
@@ -95,8 +93,7 @@ function updatePositionsForGame(game : ChessGameState,
             }
             
             const outData : PositionInfo
-                = new PositionInfo(posId, {}); //: loadPosition(posId, baseDir);
-            
+                = new PositionInfo(posId, {}, positions[i].toFEN());
 
             // check if we've already added this game to this position
             if (!JSON.stringify(outData.getHistory()).includes(gameId)) {
