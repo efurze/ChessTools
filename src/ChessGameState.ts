@@ -45,7 +45,7 @@ export class ChessGameState {
 
         Object.keys(pgn).forEach(function(key) {
             const value = pgn[key]
-            if (key === "SAN") {
+            if (key === "SAN" || key === "Moves") {
                 meta["SAN"] = value;
                 const moves = ChessGameState.parseMoves(value);
                 for (const move of moves) {
