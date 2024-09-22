@@ -58,6 +58,13 @@ class ScriptParams {
     }
 }
 
+function replacer(key:any, value:any) : any {
+    if (value instanceof Set) {
+        return [...value];
+    }
+    return value;
+}
+
 
 class PositionGenerator {
 
@@ -191,7 +198,7 @@ class PositionGenerator {
 
             // write
             console.log("saving...")
-            fs.writeFileSync(self.params.outputFile(), JSON.stringify(self.positionCache, null, " "));
+            fs.writeFileSync(self.params.outputFile(), JSON.stringify(self.positionCache, replacer, " "));
             /*
             this.posIdsToWrite = Object.keys(this.positionCache);
             for (let i=0; i < PositionGenerator.MAX_FILEHANDLES; i++) {
