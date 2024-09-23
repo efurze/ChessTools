@@ -21,10 +21,11 @@ import * as readline from 'readline';
 import * as path from 'path';
 import { Worker } from 'worker_threads';
 import { PositionInfo } from './PositionInfo';
+import { ChessGameState } from './ChessGameState';
 import * as crypto from 'crypto';
 const fsp = fs.promises;
+import { ObjectIterator } from './ObjectIterator';
 
-const GAME_DIR : string = "games";
 const POSITION_DIR : string = "positions";
 let INITIAL_IMPORT : boolean = false;
 
@@ -73,7 +74,7 @@ class PositionGenerator {
     private static MAX_FILEHANDLES : number = 20;
 
     private params : ScriptParams;
-    private fileGenerator : Generator<string>;
+    private gameIterator : ObjectIterator;
     //private writer : BufferedWriter;
     private filter : {[key:string] : number} | undefined = undefined;
     private gameCount : number = 0;
@@ -87,8 +88,8 @@ class PositionGenerator {
 
     public constructor() {
         this.params = this.readArgs();
-        this.fileGenerator = this.enumerateFiles(this.params.gamesDir());
-        //this.writer = new BufferedWriter(this.readAnotherGame.bind(this));
+        this.gameIterator = new ObjectIterator(this.params.gamesDir());
+        this.gameIterator.init();
     }
 
     private generateBase64Characters(): string[] {
@@ -130,17 +131,6 @@ class PositionGenerator {
         }
     }
 
-    private initializeWorkers() : void {
-        const self = this;
-        for (let i=0; i < PositionGenerator.MAX_WORKERS; i++) {
-            const worker = new Worker('./dist/process_game_worker.js', {
-                workerData: {filter:self.filter}
-            });
-            worker.on('message', this.workerMsg.bind(this));
-            this.workers.push(worker);
-        }
-    }
-
     private loadFilter(filterFile: string) : void {
         try {
             this.filter = JSON.parse(fs.readFileSync(filterFile).toString());
@@ -152,7 +142,7 @@ class PositionGenerator {
     private readArgs(): ScriptParams {
         const args = process.argv.slice(2); // first 2 args are node and this file
         if (args.length < 2) {
-            console.log("Not enough parameters. USAGE: node GeneratePositionHistories.js [filter.json] gamesdir/ output.json");
+            console.log("Not enough parameters. USAGE: node GeneratePositionHistories.js [filter.json] games.json output.json");
             process.exit(1);
         }
 
@@ -162,13 +152,6 @@ class PositionGenerator {
         return params;
     }
 
-/*
-    private savePosition(pos : PositionInfo) : void {
-        const baseDir = this.params.outputDir();
-        const filePath = path.join(baseDir, POSITION_DIR, pos.getId().slice(0,2), pos.getId().slice(2));
-        this.writer.writeFile(filePath, JSON.stringify(pos.getHistory(), null, " "));
-    }
-*/
 
     private cachePosition(pos : PositionInfo) : void {
         if (pos.getId() in this.positionCache) {
@@ -208,62 +191,6 @@ class PositionGenerator {
         }
     }
 
-    private async writePosition() : Promise<void> {
-        const self = this;
-        if (self.posIdsToWrite.length) {
-            if (self.posIdsToWrite.length % 100 == 0) {
-                console.log(self.posIdsToWrite.length + " positions left to write");
-            }
-            const id = self.posIdsToWrite.shift();
-            const pos = self.positionCache[id!];
-            delete self.positionCache[id!];
-            const baseDir = self.params.outputDir();
-            const filePath = path.join(baseDir, POSITION_DIR, pos.getId().slice(0,2), pos.getId().slice(2));
-            await fsp.writeFile(filePath, JSON.stringify(pos.getHistory(), null, " "));
-
-            self.writePosition();
-        }
-    }
-
-    private * enumerateFiles(dir : string) : Generator<string> {
-      for (const entry of fs.readdirSync(dir)) {
-        const fullPath : string = path.join(dir, entry);
-        if (fs.statSync(fullPath).isDirectory()) {
-          yield* this.enumerateFiles(fullPath);
-        } else {
-          yield fullPath;
-        }
-      }
-    }
-
-    private workerMsg(positions : string[]) : void {
-        //console.log("worker callback with " + positions.length + " positions");
-        const self = this;
-
-        // TODO: I probably can't count on 1 callback per game, so this isn't stable.
-        // if the script fails to terminate after all the data's read this is probably why
-        self.gamesPending--;
-
-        self.gameCount ++;
-        if (self.gameCount % 100 == 0) {
-            console.error("game " + self.gameCount, new Date(Date.now()).toLocaleTimeString('en-US'));
-        }
-        
-        positions.forEach(function(pos:string) {
-            const position = PositionInfo.fromString(pos);
-            self.cachePosition(position);
-        })
-
-        if (self.gameCount % 50000 == 0) {
-            self.pruneCache();
-        }
-
-        if (!self.readAllGames) {
-            self.readAnotherGame();
-        } else if (!self.gamesPending) {
-            self.shutDownIfDone();
-        }
-    }
 
     private pruneCache() : void {
         const self = this;
@@ -275,131 +202,49 @@ class PositionGenerator {
         })
     }
 
-    private workerError(msg : string) : void {
-        console.log("worker error: " + msg);
-        this.workerMsg([]);
-    }
 
-    private shutDownIfDone() : void {
-        if (this.readAllGames && this.gamesPending == 0) {
-            // terminate the workers
-            console.log("shutting down workers");
-            this.workers.forEach(function(worker : Worker) {
-                worker.terminate();
-            })
-            this.flushCache();
-        }
-    }
+    private generatePositionsForGame(game : ChessGameState, gameId : string) : PositionInfo[]  {
+        const ret : PositionInfo[] = []; // [{'nf3' : [gameid, gameid...]}, ...]
+        try {
+            const moves = ChessGameState.parseMoves(game.getMeta("SAN"));
+            const positions = game.getBoardStates();
+            for (let i=2; i < positions.length-1; i++) { // no move is made in the last position, and we want to ignore the start position
+                const posId = positions[i].toBase64();
+                
+                const outData : PositionInfo = new PositionInfo(posId, {}, positions[i].toFEN());
 
-    public readAnotherGame() : void {
-        const self = this;
-        
-        if (self.gamesPending > PositionGenerator.MAX_GAMES_PENDING || self.readAllGames) {
-            return;
+                outData.addGame(moves[i], gameId);
+                ret.push(outData);
+            }
+        } catch (err) {
+            console.log("generatePositionsForGame ERROR: " + JSON.stringify(err));
         }
 
-        let file : string = "";
-        file = self.fileGenerator.next().value;
-        if (file) {
-            self.gamesPending ++;
-            self.currentWorker ++;
-            self.currentWorker %= PositionGenerator.MAX_WORKERS;
-            self.workers[self.currentWorker].postMessage({data: [file]});
-            
-        } else {
-            self.readAllGames = true;
-            console.log("**** end of input", self.gamesPending + " games still to process");
-            //self.writer.dataDone();
-            self.shutDownIfDone();
-        }
+        return ret;
     }
     
 
-    public run(): void {
+    public async run(): Promise<void> {
         const self = this;
-        //console.log("Initializing destination directory");
-        //self.initializeOutputDirectory(self.params.outputDir());
-        //self.loadFilter(self.params.filterFile());
-        self.initializeWorkers();
-        for (let i=0; i < PositionGenerator.MAX_WORKERS; i++) {
-            self.readAnotherGame();
+        let count : number = 0;
+        let gameData : string[] | undefined = [];
+
+        while((gameData = await self.gameIterator.next()) !== undefined) {
+            const game = ChessGameState.fromJSON(JSON.parse(gameData[1]));
+            const positions = self.generatePositionsForGame(game, gameData[0]);
+            positions.forEach(function(pos) {
+                self.cachePosition(pos);
+            })
+            if (++count % 100 == 0) {
+                console.log(count + " games processed");
+            }
         }
+
+        self.flushCache();
     }
 
 } // class PositionGenerator
 
-/*
-class BufferedWriter {
-
-    
-    // This limits the number of open file descriptors
-    private static MAX_PENDING : number = 10;
-    private static MAX_BUFFER : number = 1000;
-    private pendingWrites : number = 0;
-    private buffer : {filepath:string, data:string}[] = [];
-    private requestMoreDataCB : ()=>void;
-    private writeCount: number = 0;
-    private done: boolean = false;
-
-    public constructor(requestDataCB : ()=>void) {
-        this.requestMoreDataCB = requestDataCB;
-    }
-
-    public dataDone() : void {
-        this.done = true;
-    }
-
-    public start() : void {
-        this.pump();
-    }
-
-    public written() : number {
-        return this.writeCount;
-    }
-
-    public writeFile(filepath:string, data:string) : void {
-        this.buffer.push({filepath: filepath, data: data});
-        //this.pump();
-    }
-
-    public beginWrite() {
-        console.log("beginWrite: " + this.buffer.length);
-        for (let i=0; i < BufferedWriter.MAX_PENDING; i++) {
-            this.doPump();
-        }
-    }
-
-    public pump() : void {
-        const self = this;
-        setTimeout(function(){self.doPump();}, 0);
-    }
-
-    private async doPump() : Promise<void> {
-        const self = this;
-        if (self.buffer.length && self.pendingWrites < BufferedWriter.MAX_PENDING) {
-            self.pendingWrites++;
-            const toWrite : {filepath:string, data:string} | undefined = self.buffer.shift();
-            if (toWrite) {
-                try {
-                    console.log("writing " + toWrite.filepath);
-                    await fsp.writeFile(toWrite.filepath, toWrite.data);
-                } catch (err) {
-
-                } finally {
-                    self.pendingWrites--;
-                    self.writeCount++;
-                    if (self.done && self.buffer.length % 100 == 0) {
-                        console.log(self.buffer.length + " files left to write.");
-                    }
-                    self.pump();
-                }
-                
-            }
-        } 
-        
-    }
-}
-*/
 
 console.log("Starting");
 new PositionGenerator().run();
