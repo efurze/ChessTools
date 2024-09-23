@@ -95,14 +95,14 @@ export class ObjectIterator {
 		const self = this;
 		let object : string = "{";
 		let read : string | undefined = await self.readUntil(new RegExp(/{/));
-		if (!read) {
+		if (read == undefined) {
 			return undefined;
 		}
 		self.advance(1);
 		let depth = 1;
 		while (depth > 0) {
 			read = await self.readUntil(new RegExp(/[{}]/));
-			if (!read) {
+			if (read == undefined) {
 				return undefined;
 			}
 			object += read;
@@ -124,10 +124,10 @@ export class ObjectIterator {
 		let key : string | undefined = await this.readUntil(new RegExp(/:/));
 		//console.log("read key: " + key);
 
-		if (!key) {
+		if (key == undefined) {
 			return undefined;
 		}
-		key = key.replace(",", "").trim();
+		key = key.replace(/[,'"]/g, "").trim();
 
 		
 		// advance past ":"
@@ -153,7 +153,7 @@ export class ObjectIterator {
 
 /*
 async function runScript() : Promise<void> {
-	let it = new ObjectIterator("./positions_gmgames.json");
+	let it = new ObjectIterator("./test.json");
 	await it.init();
 	let res : string[] | undefined = [];
 	while((res = await it.next()) !== undefined) {
