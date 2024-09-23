@@ -195,11 +195,15 @@ class PositionGenerator {
     private pruneCache() : void {
         const self = this;
         const ids = Object.keys(self.positionCache);
+        const total = ids.length;
+        let count = 0;
         ids.forEach(function(id) {
             if (self.positionCache[id].getGameCount() < 3) {
                 delete self.positionCache[id];
+                count ++;
             }
         })
+        console.log("Pruned " + count + " out of " + total + " positions");
     }
 
 
@@ -237,6 +241,10 @@ class PositionGenerator {
             })
             if (++count % 100 == 0) {
                 console.log(count + " games processed");
+            }
+
+            if (count % 50000 == 0) {
+                self.pruneCache();
             }
         }
 
