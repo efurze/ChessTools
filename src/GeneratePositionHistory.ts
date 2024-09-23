@@ -20,7 +20,7 @@ import * as fs from 'fs';
 import * as readline from 'readline';
 import * as path from 'path';
 import { Worker } from 'worker_threads';
-import { PositionInfo } from './process_game_worker';
+import { PositionInfo } from './PositionInfo';
 import * as crypto from 'crypto';
 const fsp = fs.promises;
 
