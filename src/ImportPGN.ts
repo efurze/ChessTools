@@ -47,7 +47,7 @@ function initializeOutputDirectory(outputdir : string) : void {
 function readArgs(): ScriptParams {
     const args = process.argv.slice(2); // first 2 args are node and this file
     if (args.length < 2) {
-        console.log("Not enough parameters. USAGE: node ImportPGN.js games.pgn outputdir/");
+        console.log("Not enough parameters. USAGE: node ImportPGN.js games.pgn output.json");
         process.exit(1);
     }
 
@@ -63,8 +63,8 @@ async function importGame(data : string[], outFile : string) : Promise<void> {
             || joinedData.includes("Fischer Random") || joinedData.includes("Freestyle Chess")) {
             return;
         }
-        const game = ChessGameState.fromPGN(joinedData);
-        const moves = ChessGameState.parseMoves(game.getMeta("SAN"));
+        const meta = ChessGameState.parseMetaFromPGN(joinedData);
+        const moves = ChessGameState.parseMoves(meta["SAN"]);
 
         // filename is 64-bit hash of the move sequence
         const hash = crypto.createHash('sha256')
@@ -72,11 +72,6 @@ async function importGame(data : string[], outFile : string) : Promise<void> {
                         .digest('hex')
                         .slice(0,16);
 
-
-        let outdata: {[key: string]:string} = {};
-         game.getMetaKeys().forEach(function(key:string) {
-            outdata[key] = game.getMeta(key);
-         })
          // Save game file. Files are sharded by splitting the first 2 bytes of the hash
          // 'e8e7c50fbff3c046' => 'e8/e7c50fbff3c046'
          /*
@@ -87,7 +82,7 @@ async function importGame(data : string[], outFile : string) : Promise<void> {
                             JSON.stringify(outdata, null, " ")); 
         */
 
-         await fsp.appendFile(outFile, `"${hash}":${JSON.stringify(outdata)},\n`);
+         await fsp.appendFile(outFile, `"${hash}":${JSON.stringify(meta)},\n`);
 
     } catch (err) {
         console.log(err);
