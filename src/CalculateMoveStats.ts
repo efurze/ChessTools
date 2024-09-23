@@ -2,7 +2,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-
+import { PositionInfo } from './PositionInfo';
+import { ObjectIterator } from './ObjectIterator';
 
 
 function saveObject(obj : any, filename : string) : void {
@@ -53,22 +54,12 @@ export class CalculateMoveStats {
 		}
 	}
 
-	public loadFile(filename:string) : string {
-		// Load the object from the JSON file
-		try {
-			const data = fs.readFileSync(filename, 'utf8');
-			return data.toString();
-		} catch (e) {
-			console.log("JSON file not read: " + filename);
-		}
-		return "";
-	}
 
 /*
 
   This returns all unique moves in a position and calculates various metadata for it.
 
-  This sorts all moves made by date, then step forward through time. For each move it calculates how many times it occurred,
+  This sorts all moves made by date, then walks over them in order. For each move it calculates how many times it occurred,
   how many times the position was played before the move, and how many times the position occured after. We also want to know how the
   frequencies of other moves changed with the advent of a given move, and that's what all the 'pivot' business is about. Each 'first move'
   defineds a pivot date which we want to record the occurences of all other moves relative to. Pivots will only exist for new moves
@@ -82,7 +73,7 @@ export class CalculateMoveStats {
 */
 	public analyzeMovesForPosition (pos : PositionInfo) : MoveInfo[] {
 			const self = this;
-	  	const history : {[key:string] : string[]} = pos.getHistory();
+	  	const history : {[key:string] : Set<string>} = pos.getHistory();
 	  	const moves = Object.keys(history); // distinct moves for this position
 	  	const moveOccurrences : string[][] = []; // [['nf3', <gameId>], ['Qc1', <gameId>] ... ]
 
@@ -90,7 +81,15 @@ export class CalculateMoveStats {
 			// helper functions so I don't have to type gameInfos[moveOccurrences[m][1]].get("Date") everywhere
 			//-----------------------------------------------------------------------------------------------------
 	  	function getMoveDate(m : string[]) : string {
-	  		return self.gameInfos[m[1]].get("Date");
+	  		try {
+		  		return self.gameInfos[m[1]].get("Date");
+		  	} catch (err) {
+		  		console.log(m[1]);
+		  		console.log(self.gameInfos[m[1]]);
+
+		  		process.exit();
+		  	}
+		  	return "";
 	  	}
 	  	function getGameInfo(m : string[]) : GameInfo {
 	  		return self.gameInfos[m[1]];
@@ -105,7 +104,7 @@ export class CalculateMoveStats {
 	  	// total times this position has occurred
 	  	let occurrances = 0;
 	  	moves.forEach(function(move : string) { // each unique move ever made in the position
-	    	occurrances += history[move].length;
+	    	occurrances += history[move].size;
 		    history[move].forEach(function(gameId:string) {
 		    	moveOccurrences.push([move, gameId]);
 		    })
@@ -185,7 +184,7 @@ export class CalculateMoveStats {
 					    		JSON.parse(JSON.stringify(knownMoves)),
 					    		gameInfo.get("White"),
 					    		gameInfo.get("Black"),
-					    		pos.getFen(), 
+					    		pos.getFEN(),
 					    		pos.getId());
 
 	    		knownMoves.push(move);
@@ -391,47 +390,6 @@ class GameInfo {
 	}
 }
 
-export class PositionInfo {
-	private fen : string;
-	private id : string;
-	private history : {[key:string] : string[]}; // {'nf3' : [gameid, gameid ...], 'e4':[], ...}
-
-	public constructor(fen:string, history:{[key:string] : string[]}, id:string="") {
-		this.fen = fen;
-		this.id = id;
-		this.history = history;
-	}
-
-	public getFen() : string {
-		return this.fen;
-	}
-
-	public getId() : string {
-		return this.id;
-	}
-
-	public getHistory() : {[key:string] : string[]} {
-		return this.history;
-	}
-
-	public addGame(move:string, gameId:string) : void {
-		this.history[move] = this.history[move] ?? [];
-		this.history[move].push(gameId);
-	}
-
-	public toString() : string {
-		const obj = {
-			id: this.id,
-			history: this.history
-		};
-		return JSON.stringify(obj);
-	}
-
-	public static fromString(data : string, posId:string="") : PositionInfo {
-		const obj = JSON.parse(data);
-		return new PositionInfo(obj.fen, obj.moves, posId);
-	}
-}
 
 
 //===================================================================================================================================================
@@ -440,9 +398,8 @@ export class PositionInfo {
 
 
 
-function runScript(gamesfile:string, positionspath:string) : MoveInfo[] {
-	let file;
-	let count = 0;
+async function runScript(gamesfile:string, positionsfile:string) : Promise<MoveInfo[]> {
+	let count : number = 0;
 	let ret : MoveInfo[] = [];
 
 	const strData : string = fs.readFileSync(gamesfile).toString();
@@ -457,12 +414,13 @@ function runScript(gamesfile:string, positionspath:string) : MoveInfo[] {
 
 
 	const moveFinder = new CalculateMoveStats(games);
-	const fileGenerator = moveFinder.enumerateFiles(positionspath);
+	const positionIterator = new ObjectIterator(positionsfile);
+	positionIterator.init();
+	let posData : string[] | undefined = [];
 
-	while ((file = fileGenerator.next().value) !== undefined) {
+	while ((posData = await positionIterator.next()) !== undefined) {
 	    count++;
-	    const posId = path.basename(path.dirname(file)) + path.basename(file);
-	    const position = PositionInfo.fromString(moveFinder.loadFile(file), posId);
+	    const position = PositionInfo.fromString(posData[1]);
 	    const moves = moveFinder.analyzeMovesForPosition(position);
 	    const novelties = moveFinder.filterMoves(moves);
 	    ret = ret.concat(novelties);
@@ -482,10 +440,13 @@ if (process.argv[1].endsWith("CalculateMoveStats.js")) { // we don't want to run
 
 	const args = process.argv.slice(2); // first 2 args are node and this file
 	if (args.length < 3) {
-	    console.error("Not enough parameters. USAGE: node CalculateMoveState.js games.json path/to/positions output.json");
+	    console.error("Not enough parameters. USAGE: node CalculateMoveState.js games.json positions.json output.json");
 	    process.exit(1);
 	}
 
-	const moves = runScript(args[0], args[1]).map(function(move:MoveInfo){return move.toObj();});
-	fs.writeFileSync(args[2], JSON.stringify(moves, null, " "));
+	runScript(args[0], args[1])
+		.then(function(moves : MoveInfo[]){
+			const objs : unknown[] = moves.map(function(move:MoveInfo){return move.toObj();});
+			fs.writeFileSync(args[2], JSON.stringify(objs, null, " "));
+		});
 }
