@@ -6,14 +6,6 @@ import { PositionInfo } from './PositionInfo';
 import { ObjectIterator } from './ObjectIterator';
 
 
-function saveObject(obj : any, filename : string) : void {
-  try {
-    const json = JSON.stringify(obj, null, " ");
-    fs.writeFileSync(filename, json);
-  } catch (e) {
-    console.error(e);
-  }
-}
 
 // negative return value => a comes before b
 function compareDates(a : string, b : string) : number {
@@ -83,13 +75,6 @@ export class CalculateMoveStats {
 	  	function getMoveDate(m : string[]) : string {
 	  		try {
 		  		return self.gameInfos[m[1]].get("Date");
-		  	} catch (err) {
-		  		console.log(m[1]);
-		  		console.log(self.gameInfos[m[1]]);
-
-		  		process.exit();
-		  	}
-		  	return "";
 	  	}
 	  	function getGameInfo(m : string[]) : GameInfo {
 	  		return self.gameInfos[m[1]];
@@ -395,13 +380,32 @@ class GameInfo {
 //===================================================================================================================================================
 
 
+async function loadGames(gamesfile:string) : Promise<{[key:string]:GameInfo}> {
+	console.log("loading games");
+	const ret : {[key:string]:GameInfo} = {};
+	const gameIterator = new ObjectIterator(gamesfile);
+	await gameIterator.init();
+	let count : number = 0;
+	let gameData : string[] | undefined = [];
+	while ((gameData = await gameIterator.next()) !== undefined) {
+		const game = new GameInfo(JSON.parse(gameData[1]));
+		game.set("id", gameData[0]);
+		ret[gameData[0]] = game;
 
+		if (++count % 1000 == 0) {
+			console.log("loaded " + count + " games");
+		}
+	}
+
+	return ret;
+}
 
 
 async function runScript(gamesfile:string, positionsfile:string) : Promise<MoveInfo[]> {
 	let count : number = 0;
 	let ret : MoveInfo[] = [];
 
+/*
 	const strData : string = fs.readFileSync(gamesfile).toString();
 	const gameObj = JSON.parse(strData);
 	const games : {[key:string]:GameInfo} = {};
@@ -411,11 +415,12 @@ async function runScript(gamesfile:string, positionsfile:string) : Promise<MoveI
 		game.set("id", gameId);
 		games[gameId] = game;
 	})
-
+*/
+	const games = await loadGames(gamesfile);
 
 	const moveFinder = new CalculateMoveStats(games);
 	const positionIterator = new ObjectIterator(positionsfile);
-	positionIterator.init();
+	await positionIterator.init();
 	let posData : string[] | undefined = [];
 
 	while ((posData = await positionIterator.next()) !== undefined) {
@@ -426,7 +431,7 @@ async function runScript(gamesfile:string, positionsfile:string) : Promise<MoveI
 	    ret = ret.concat(novelties);
 
 	    if (count % 10 == 0) {
-	    	console.error("Analyzed " + count + " positions, found " + ret.length + " interesting moves so far");
+	    	console.log("Analyzed " + count + " positions, found " + ret.length + " interesting moves so far");
 	    }
 	}
 
@@ -436,7 +441,7 @@ async function runScript(gamesfile:string, positionsfile:string) : Promise<MoveI
 
 
 if (process.argv[1].endsWith("CalculateMoveStats.js")) { // we don't want to run the script if we're being unit tested
-	console.error("starting");
+	console.log("starting");
 
 	const args = process.argv.slice(2); // first 2 args are node and this file
 	if (args.length < 3) {
