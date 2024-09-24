@@ -73,7 +73,6 @@ export class CalculateMoveStats {
 			// helper functions so I don't have to type gameInfos[moveOccurrences[m][1]].get("Date") everywhere
 			//-----------------------------------------------------------------------------------------------------
 	  	function getMoveDate(m : string[]) : string {
-	  		try {
 		  		return self.gameInfos[m[1]].get("Date");
 	  	}
 	  	function getGameInfo(m : string[]) : GameInfo {
