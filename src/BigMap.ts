@@ -19,24 +19,26 @@ export class BigMap<T> {
 
 	constructor() {
 		const self = this;
-		for(let i=0; i<10; i++) {
+		for(let i=0; i<100; i++) {
 			self.shards[i] = new Map<string,T>();
 		}
 	}
 
+	private getShard(key:string) : Map<string,T> {
+		const hash = murmur.v3(key);
+		return this.shards[hash % this.shards.length];
+	}
+
 	public set(key:string, value:T) : void {
-		const hash:string = murmur.v3(key).toString();
-		this.shards[parseInt(hash[0])].set(key, value);
+		this.getShard(key).set(key, value);
 	}
 
 	public get(key:string) : T | undefined {
-		const hash:string = murmur.v3(key).toString();
-		return this.shards[parseInt(hash[0])].get(key);
+		return this.getShard(key).get(key);
 	}
 
 	public delete(key:string) : void {
-		const hash:string = murmur.v3(key).toString();
-		this.shards[parseInt(hash[0])].delete(key);
+		this.getShard(key).delete(key);
 	}
 
 	public size() : number {
@@ -46,6 +48,16 @@ export class BigMap<T> {
 			total += shard.size;
 		})
 		return total;
+	}
+
+	public maxShardSize() : number {
+		const self = this;
+		let max = 0;
+		self.shards.forEach(function(shard) {
+			max = Math.max(max, shard.size);
+		})
+
+		return max;
 	}
 
 
