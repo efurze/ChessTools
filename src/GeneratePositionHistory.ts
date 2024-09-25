@@ -61,6 +61,10 @@ class ScriptParams {
         return this.filter;
     }
 
+    public hasFilter() : boolean {
+        return this.filter.length > 0;
+    }
+
     public filterMode() : boolean {
         return this.filter_mode;
     }
@@ -76,18 +80,13 @@ function replacer(key:any, value:any) : any {
 
 class PositionGenerator {
 
-    private static MAX_WORKERS : number = 20;
-    private static MAX_GAMES_PENDING : number = 100;
-    private static MAX_FILEHANDLES : number = 20;
-
     private params : ScriptParams;
     private gameIterator : ObjectIterator;
-    private filter : {[key:string] : number} | undefined = undefined;
+    private filter : Set<string> | null = null;
     private gameCount : number = 0;
     private positionCache : {[id:string]:PositionInfo} = {};
     private positionCount : BigMap<number> = new BigMap<number>();
     private posIdsToWrite : Set<string> = new Set<string>();
-    private position_count : number = 0;
 
     public constructor() {
         this.params = this.readArgs();
@@ -135,10 +134,15 @@ class PositionGenerator {
     }
 
     private loadFilter(filterFile: string) : void {
+        const self = this;
         try {
-            this.filter = JSON.parse(fs.readFileSync(filterFile).toString());
+            const filterArray : string[] = JSON.parse(fs.readFileSync(filterFile).toString());
+            self.filter = new Set<string>();
+            filterArray.forEach(function(id) {
+                self.filter?.add(id);
+            })
         } catch (err) {
-            this.filter = undefined;
+            self.filter = null;
         }
     }
 
@@ -177,6 +181,10 @@ class PositionGenerator {
 
 
     private cachePosition(pos : PositionInfo) : void {
+        if (this.filter !== null && !this.filter.has(pos.getId())) {
+            return;
+        }
+
         if (pos.getId() in this.positionCache) {
             this.positionCache[pos.getId()].merge(pos);
         } else {
@@ -207,6 +215,10 @@ class PositionGenerator {
 
     private pruneCache(min:number) : void {
         const self = this;
+        if (self.filter !== null) {
+            // we're using a filter, no need to prune
+            return;
+        }
         const ids = Object.keys(self.positionCache);
         const total = ids.length;
         let count = 0;
@@ -245,6 +257,10 @@ class PositionGenerator {
         const self = this;
         let count : number = 0;
         let gameData : string[] | undefined = [];
+
+        if (self.params.hasFilter()) {
+            self.loadFilter(self.params.filterFile());
+        }
 
         if (self.params.filterMode()) {
             console.log("Generating filter");
