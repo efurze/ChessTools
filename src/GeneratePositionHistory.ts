@@ -25,6 +25,7 @@ import { ChessGameState } from './ChessGameState';
 import * as crypto from 'crypto';
 const fsp = fs.promises;
 import { ObjectIterator } from './ObjectIterator';
+import { BigMap } from './BigMap';
 
 const POSITION_DIR : string = "positions";
 let INITIAL_IMPORT : boolean = false;
@@ -35,11 +36,13 @@ class ScriptParams {
     private games_dir : string;
     private output_file : string;
     private filter : string;
+    private filter_mode : boolean = false;
    
-    public constructor(filterFile: string, gamesDir: string, outputFile: string) {
+    public constructor(filterFile: string, gamesDir: string, outputFile: string, filterMode: boolean) {
         this.filter = filterFile;
         this.output_file = outputFile;
         this.games_dir = gamesDir;
+        this.filter_mode = filterMode;
     }
 
     public gamesDir() : string {
@@ -56,6 +59,10 @@ class ScriptParams {
 
     public filterFile() : string {
         return this.filter;
+    }
+
+    public filterMode() : boolean {
+        return this.filter_mode;
     }
 }
 
@@ -75,16 +82,12 @@ class PositionGenerator {
 
     private params : ScriptParams;
     private gameIterator : ObjectIterator;
-    //private writer : BufferedWriter;
     private filter : {[key:string] : number} | undefined = undefined;
     private gameCount : number = 0;
-    private gamesPending : number = 0; // # of games we're waiting for the workers to finish
-    private currentWorker : number = 0; // round-robin pointer
-    private workers : Worker[] = [];
-    private readAllGames : boolean = false;
     private positionCache : {[id:string]:PositionInfo} = {};
-    private posIdsToWrite : string[] = [];
-    private flushed = false;
+    private positionCount : BigMap<number> = new BigMap<number>();
+    private posIdsToWrite : Set<string> = new Set<string>();
+    private position_count : number = 0;
 
     public constructor() {
         this.params = this.readArgs();
@@ -141,14 +144,34 @@ class PositionGenerator {
 
     private readArgs(): ScriptParams {
         const args = process.argv.slice(2); // first 2 args are node and this file
-        if (args.length < 2) {
-            console.log("Not enough parameters. USAGE: node GeneratePositionHistories.js [filter.json] games.json output.json");
+        let filterMode = false;
+        const nonFlagArgs: string[] = [];
+        args.forEach(function(arg) {
+            if (arg === "-f") {
+                filterMode = true;
+            } else {
+                nonFlagArgs.push(arg);
+            }
+        })
+
+        if (!filterMode && nonFlagArgs.length < 2) {
+            console.log("Not enough parameters. USAGE: node GeneratePositionHistories.js [-f] [filter.json] games.json output.json");
+            process.exit(1);
+        } else if (filterMode && nonFlagArgs.length < 1) {
+            console.log("Must provide input gamefile in filter mode");
             process.exit(1);
         }
 
-        const params = args.length > 2  
-                            ? new ScriptParams(args[0], args[1], args[2])
-                            : new ScriptParams("", args[0], args[1]);
+        let params : ScriptParams;
+
+        if (filterMode) {
+            params = new ScriptParams("", nonFlagArgs[0], "", true);
+        } else {
+            params = nonFlagArgs.length > 2  
+                                ? new ScriptParams(nonFlagArgs[0], nonFlagArgs[1], nonFlagArgs[2], false)
+                                : new ScriptParams("", nonFlagArgs[0], nonFlagArgs[1], false);
+        }
+
         return params;
     }
 
@@ -164,41 +187,31 @@ class PositionGenerator {
 
     private flushCache() : void {
         const self = this;
-
-        if (!self.flushed) {
-            self.flushed = true;
             
-            // do a final prune
-            const ids = Object.keys(self.positionCache);
-            ids.forEach(function(id) {
-                if (self.positionCache[id].getGameCount() < 50) {
-                    delete self.positionCache[id];
-                } else if (self.positionCache[id].getGameCount() > 500000) {
-                    // prune the starting pos
-                    delete self.positionCache[id];
-                }
-            })
-
-            // write
-            console.log("saving...")
-            fs.writeFileSync(self.params.outputFile(), JSON.stringify(self.positionCache, replacer, " "));
-            /*
-            this.posIdsToWrite = Object.keys(this.positionCache);
-            for (let i=0; i < PositionGenerator.MAX_FILEHANDLES; i++) {
-                this.writePosition();
+        // do a final prune
+        const ids = Object.keys(self.positionCache);
+        ids.forEach(function(id) {
+            if (self.positionCache[id].getGameCount() < 50) {
+                delete self.positionCache[id];
+            } else if (self.positionCache[id].getGameCount() > 500000) {
+                // prune the starting pos
+                delete self.positionCache[id];
             }
-            */
-        }
+        })
+
+        // write
+        console.log("saving...");
+        fs.writeFileSync(self.params.outputFile(), JSON.stringify(self.positionCache, replacer, " "));
     }
 
 
-    private pruneCache() : void {
+    private pruneCache(min:number) : void {
         const self = this;
         const ids = Object.keys(self.positionCache);
         const total = ids.length;
         let count = 0;
         ids.forEach(function(id) {
-            if (self.positionCache[id].getGameCount() < 3) {
+            if (self.positionCache[id].getGameCount() < min) {
                 delete self.positionCache[id];
                 count ++;
             }
@@ -212,7 +225,7 @@ class PositionGenerator {
         try {
             const moves = ChessGameState.parseMoves(game.getMeta("SAN"));
             const positions = game.getBoardStates();
-            for (let i=2; i < positions.length-1; i++) { // no move is made in the last position, and we want to ignore the start position
+            for (let i=2; i < positions.length-1; i++) { // no move is made in the last position, and we want to ignore the first 2 moves
                 const posId = positions[i].toBase64();
                 
                 const outData : PositionInfo = new PositionInfo(posId, {}, positions[i].toFEN());
@@ -233,22 +246,53 @@ class PositionGenerator {
         let count : number = 0;
         let gameData : string[] | undefined = [];
 
+        if (self.params.filterMode()) {
+            console.log("Generating filter");
+        }
+
         while((gameData = await self.gameIterator.next()) !== undefined) {
             const game = ChessGameState.fromJSON(JSON.parse(gameData[1]));
             const positions = self.generatePositionsForGame(game, gameData[0]);
             positions.forEach(function(pos) {
-                self.cachePosition(pos);
+                
+                if (self.params.filterMode()) {
+                    
+                    if (self.posIdsToWrite.has(pos.getId())) {
+                        // position has already passed threshold
+                        return;
+                    }
+
+                    let count = self.positionCount.get(pos.getId()) ?? 0;
+
+                    if (++count >= 50) {
+                        self.posIdsToWrite.add(pos.getId());
+                    } else {
+                        self.positionCount.set(pos.getId(), count + 1);
+                    }
+
+                } else {
+                    self.cachePosition(pos);
+                }
             })
-            if (++count % 100 == 0) {
-                console.log(count + " games processed");
+            if (++count % 1000 == 0) {
+                if (self.params.filterMode()) {
+                    console.log(count + " games processed", self.positionCount.size() + " positions");
+                } else {
+                    console.log(count + " games processed");
+                }
             }
 
-            if (count % 50000 == 0) {
-                self.pruneCache();
+            if (!self.params.filterMode() && count % 50000 == 0) {
+                self.pruneCache(3);
             }
         }
 
-        self.flushCache();
+        if (self.params.filterMode()) {
+            console.log("Writing filter. Saving " + self.posIdsToWrite.size + " out of " + self.positionCount.size());
+            fs.writeFileSync("filter.json", JSON.stringify(self.posIdsToWrite, replacer, " "));
+        } else {
+            self.flushCache();
+        }
     }
 
 } // class PositionGenerator
