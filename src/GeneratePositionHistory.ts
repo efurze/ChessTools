@@ -283,7 +283,7 @@ class PositionGenerator {
                     if (++count >= 50) {
                         self.posIdsToWrite.add(pos.getId());
                     } else {
-                        self.positionCount.set(pos.getId(), count + 1);
+                        self.positionCount.set(pos.getId(), count);
                     }
 
                 } else {
