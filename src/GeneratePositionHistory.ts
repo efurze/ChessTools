@@ -135,15 +135,11 @@ class PositionGenerator {
 
     private loadFilter(filterFile: string) : void {
         const self = this;
-        try {
-            const filterArray : string[] = JSON.parse(fs.readFileSync(filterFile).toString());
-            self.filter = new Set<string>();
-            filterArray.forEach(function(id) {
-                self.filter?.add(id);
-            })
-        } catch (err) {
-            self.filter = null;
-        }
+        const filterArray : string[] = JSON.parse(fs.readFileSync(filterFile).toString());
+        self.filter = new Set<string>();
+        filterArray.forEach(function(id) {
+            self.filter?.add(id);
+        })
     }
 
     private readArgs(): ScriptParams {
@@ -215,7 +211,7 @@ class PositionGenerator {
                 fs.appendFileSync(self.params.outputFile(), ",\n");
             }
             const pos = self.positionCache[key];
-            fs.appendFileSync(self.params.outputFile(), `"${key}":${JSON.stringify(pos)}`);
+            fs.appendFileSync(self.params.outputFile(), `"${key}":${JSON.stringify(pos, replacer, "")}`);
         })
         fs.appendFileSync(self.params.outputFile(), "}");
         //fs.writeFileSync(self.params.outputFile(), JSON.stringify(self.positionCache, replacer, " "));
