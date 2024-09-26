@@ -80,10 +80,10 @@ export class CalculateMoveStats {
 	  	}
 	  	//-----------------------------------------------------------------------------------------------------
 
-	  	if (moves.length < 2) {
+	 // 	if (moves.length < 2) {
 	  		// if there's only 1 move that's ever been made then there can't be a novelty
-	  		return [];
-	  	}
+	 // 		return [];
+	 // 	}
 
 	  	// total times this position has occurred
 	  	let occurrances = 0;
@@ -200,7 +200,7 @@ export class CalculateMoveStats {
 		const filtered = moveHistories.filter(function(moveInfo : MoveInfo) {
 			hash[moveInfo.getMove()] = moveInfo;
 			if (moveInfo.getTotal() < 10 || moveInfo.getStrictlyBefore() < 10 || moveInfo.getStrictlyAfter() < 10) {
-				return false;
+				return true; // don't filter
 			}
 			return true;
 		})
