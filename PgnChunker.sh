@@ -16,8 +16,11 @@ while IFS= read -r line; do
   if [[ $line =~ $END_REGEX ]]; then
 
     if ! [[ $chunk =~ "Chess960" || $chunk =~ "Fisher Random" || $chunk =~ "Fischer Random" || $chunk =~ "Freestyle Chess" ]]; then
-      # Run the program with the chunk as input
-      echo "$chunk" | $PROGRAM
+      # Run the program with the chunk as input. This is for the StdinImporter.
+#      echo "$chunk" | $PROGRAM
+
+      # Send the data to the server via curl:
+      echo "$chunk" | curl -s -H "Content-Type: text/plain" --data-binary @- http://localhost:3000
     fi
     # Reset the chunk
     chunk=""

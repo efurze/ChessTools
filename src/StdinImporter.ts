@@ -7,12 +7,12 @@ class StdinImporter {
         for (const chessBoardState of chessGameState.getBoardStates()) {
 
             const tsvData = [
+                chessGameState.getOpening()?.eco ?? '',
+                chessBoardState.toBase64(),
                 chessGameState.getMeta('White'),
                 chessGameState.getMeta('Black'),
                 chessGameState.getMeta('Date'),
-                chessGameState.getOpening()?.eco ?? '',
                 chessGameState.getOpening()?.name ?? '',
-                chessBoardState.toBase64(),
                 chessBoardState.getFullMoveNumber(),
                 chessBoardState.getActiveColor()
             ]
