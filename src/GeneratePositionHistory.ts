@@ -199,7 +199,7 @@ class PositionGenerator {
         // do a final prune
         const ids = Object.keys(self.positionCache);
         ids.forEach(function(id) {
-            if (self.positionCache[id].getGameCount() < 50) {
+            if (self.positionCache[id].getGameCount() < 25) {
                 delete self.positionCache[id];
             } else if (self.positionCache[id].getGameCount() > 500000) {
                 // prune the starting pos
@@ -209,7 +209,16 @@ class PositionGenerator {
 
         // write
         console.log("saving...");
-        fs.writeFileSync(self.params.outputFile(), JSON.stringify(self.positionCache, replacer, " "));
+        fs.appendFileSync(self.params.outputFile(), "{");
+        Object.keys(self.positionCache).forEach(function(key, idx) {
+            if (idx > 0) {
+                fs.appendFileSync(self.params.outputFile(), ",\n");
+            }
+            const pos = self.positionCache[key];
+            fs.appendFileSync(self.params.outputFile(), `"${key}":${JSON.stringify(pos)}`);
+        })
+        fs.appendFileSync(self.params.outputFile(), "}");
+        //fs.writeFileSync(self.params.outputFile(), JSON.stringify(self.positionCache, replacer, " "));
     }
 
 
@@ -267,7 +276,14 @@ class PositionGenerator {
         }
 
         while((gameData = await self.gameIterator.next()) !== undefined) {
-            const game = ChessGameState.fromJSON(JSON.parse(gameData[1]));
+            let game : ChessGameState;
+
+            try {
+                game = ChessGameState.fromJSON(JSON.parse(gameData[1]));
+            } catch (err) {
+                // malformed pgn, skip game
+                continue;
+            }
             const positions = self.generatePositionsForGame(game, gameData[0]);
             positions.forEach(function(pos) {
                 
@@ -280,7 +296,7 @@ class PositionGenerator {
 
                     let count = self.positionCount.get(pos.getId()) ?? 0;
 
-                    if (++count >= 50) {
+                    if (++count >= 25) {
                         self.posIdsToWrite.add(pos.getId());
                     } else {
                         self.positionCount.set(pos.getId(), count);
@@ -292,7 +308,8 @@ class PositionGenerator {
             })
             if (++count % 1000 == 0) {
                 if (self.params.filterMode()) {
-                    console.log(count + " games processed", self.positionCount.size() + " positions");
+                    console.log(count + " games processed", self.positionCount.size() + " positions ("
+                        + "max shard=" + self.positionCount.maxShardSize() + ")");
                 } else {
                     console.log(count + " games processed");
                 }
