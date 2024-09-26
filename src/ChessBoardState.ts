@@ -823,5 +823,13 @@ export class ChessBoardState {
         return ret;
     }
 
+    public getFullMoveNumber(): number {
+        return this.fullMoveNumber;
+    }
+
+    public getActiveColor(): string {
+        return this.activeColor;
+    }
+
 }
 
