@@ -1,12 +1,42 @@
 import { ChessBoardState } from './ChessBoardState';
+import ecoJson from '../../eco.json/eco.json';
+import interpolatedJson from '../../eco.json/eco_interpolated.json';
+
+
+const ecoHash = ecoJson.reduce((acc: any, elem: any) => {
+    acc[elem.fen] = elem;
+    return acc;
+}, {});
+const openingsHash = { ...ecoHash, ... interpolatedJson };
+
+
+export type ChessOpening = {
+    eco: string,
+    name: string
+};
+
+
 
 export class ChessGameState {
     private meta: {[key: string]: string};
     private boardStates: ChessBoardState[];
+    private opening: ChessOpening | null;
 
     private constructor(meta: {[key: string]: string}, boardStates: ChessBoardState[]) {
         this.meta = meta;
         this.boardStates = boardStates;
+
+        this.opening = null;
+        for (let i = boardStates.length - 1; i >= 0; i--) {
+            const fen = boardStates[i].toFEN();
+            if (openingsHash[fen]) {
+                this.opening = {
+                    eco: openingsHash[fen].eco,
+                    name: openingsHash[fen].name
+                };
+                break;
+            }
+        }        
     }
 
     // turns "1. e4 e5 2. nf3 nc6" into [e4, e5, nf3, nc6]
@@ -81,4 +111,8 @@ export class ChessGameState {
     public getBoardStates(): ChessBoardState[] {
         return this.boardStates;
     } 
+
+    public getOpening(): ChessOpening | null {
+        return this.opening;
+    }
 }
