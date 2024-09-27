@@ -60,7 +60,9 @@ async function importGame(data : string[], outFile : string) : Promise<void> {
     try {
         const joinedData = data.join('\n');
         if (joinedData.includes("Chess960") || joinedData.includes("Fisher Random") 
-            || joinedData.includes("Fischer Random") || joinedData.includes("Freestyle Chess")) {
+            || joinedData.includes("Fischer Random") || joinedData.includes("Freestyle Chess")
+            || joinedData.includes("Blitz") || joinedData.includes("Rapid") || joinedData.includes("Bullet")
+            || joinedData.includes("Speed") || joinedData.includes("Titled Tues")) {
             return;
         }
         const meta = ChessGameState.parseMetaFromPGN(joinedData);
